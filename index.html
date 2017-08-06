@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<meta charset = "UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<head>
+	<title>Rays</title>
+	
+	<script type = "text/javascript" src = "js/lib/es6-promise.auto.min.js"></script>
+	<script type = "text/javascript" src = "js/lib/color.min.js"></script>
+	<script type = "text/javascript" src = "js/rays.js"></script>
+	
+	<link rel = "stylesheet" type = "text/css" href = "css/normalize.css">
+	<link rel = "stylesheet" type = "text/css" href = "css/rays.css">
+	
+</head>
+
+<html>
+<body onload = "app.run()">
+	<div class = "wrapper">
+		<header>
+			<h4 id = "fps_field"></h4>
+			<button onclick = "app.pause()">pause</button>
+			<button onclick = "app.resume()">resume</button>
+		</header>
+		<canvas id = "main_canvas" class = "canvas-container" width = "600px" height = "600px"></canvas>
+		<canvas id = "map_canvas" class = "canvas-container" width = "600px" height = "600px"></canvas>
+	</div>
+</body>
+</html>

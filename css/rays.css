@@ -1,0 +1,16 @@
+html {
+	background-color: #1c1c1c;
+	color: white;
+}
+
+canvas {
+	border: 1px solid gray;
+}
+
+.wrapper {
+	text-align: center;
+}
+
+.canvas-container {
+	margin-top: 6rem;
+}
