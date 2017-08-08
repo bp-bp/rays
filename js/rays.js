@@ -11,18 +11,16 @@ function Main(init) {
 	main.map_img = null; // loaded in Main.load_map()
 	main.last_tick = Date.now();
 	main.fps_field = init.fps_field || null;
+	main.fps_samples = [];
 	
 	// constants etc
 	main.focal_length = 0.8;
 	main.fov = Math.PI * 0.4;
-	main.max_view_dist = 30.0;
-	main.num_columns = 300;
+	main.max_view_dist = 20.0;
+	main.num_columns = 100;
 	main.move_speed = 5.0; // in map units per second
 	main.turn_rate = Math.PI * 0.5; // in radians per second
 	main.wall_color = new Color("#828282");
-	//main.wall_color.darken(40);
-	
-	console.log("color: ", main.wall_color);
 	
 	// events
 	document.addEventListener("keydown", main.handle_keypress.bind(main, true), false);
@@ -319,7 +317,6 @@ Main.prototype.load_map = function(url) {
 			
 			// now draw it scaled-up on the map canvas
 			main.draw_minimap();
-			//main.map_ctx.drawImage(this, 0, 0, main.map_canvas.width, main.map_canvas.height);
 			
 			resolve(img_data);
 		};
@@ -340,27 +337,10 @@ Main.prototype.load_map = function(url) {
 	);
 	
 	return img_data_prom;
-	/*
-	map_img.onload = function() {
-		view_ctx.drawImage(this, 0, 0);
-		img_data = view_ctx.getImageData(0, 0, map_img.width, map_img.height);
-		
-		var i;
-		for (i = 0; i < 8; i++) {
-			console.log(i + ": " + img_data.data[i]);
-		}
-		
-	};
-	
-	map_img.src = url;
-	*/
 };
 
 Main.prototype.handle_keypress = function(val, e) {
 	var main = this;
-	
-	//console.log("val: ", val);
-	//console.log("e: ", e);
 	
 	if (e.code === "KeyW") {
 		main.move_state.forward = val;
@@ -383,14 +363,10 @@ Main.prototype.draw_column = function(col) {
 		return;
 	}
 	
-	//var bend_factor = col.dist * Math.cos(col.ang);
-	//var draw_height = main.canvas.height * (1.0 / (col.dist));
 	var draw_height = main.canvas.height / (col.dist);
-	//var draw_height = main.canvas.height * (main.canvas.height / (col.dist * Math.cos(col.ang)));
 	var draw_width = main.canvas.width / main.num_columns;
 	
 	var init = {x: 0, y: 0, width: draw_width, height: draw_height};
-	//console.log("init: ", init);
 	var draw_rect = new main.Rect(init);
 	var center = new main.Pt({x: (draw_width * col.idx) - (draw_width / 2.0), y: main.canvas.height / 2.0});
 	draw_rect.center(center);
@@ -404,7 +380,8 @@ Main.prototype.draw_column = function(col) {
 	main.view_ctx.fillRect(draw_rect.x, draw_rect.y, draw_rect.width, draw_rect.height);
 };
 
-// 
+// parallel-to-wall problem is in here -- when on negative side of wall,
+// rays pointing away from wall will have cos or sin < 0 and check the wrong square
 Main.prototype.get_square = function(x, y, cos, sin) {
 	var main = this;
 	
@@ -467,13 +444,7 @@ Main.prototype.get_columns = function() {
 	return columns;
 	
 	function outside_map(pt) {
-		if (pt.x < 0 || pt.y < 0) {
-			return true;
-		}
-		if (pt.x > main.map_img.width || pt.y > main.map_img.height) {
-			return true;
-		}
-		
+		return (pt.x < 0 || pt.y < 0) || (pt.x > main.map_img.width || pt.y > main.map_img.height);
 	}
 	
 	function nearest_wall(ang) {
@@ -481,31 +452,21 @@ Main.prototype.get_columns = function() {
 		var temp_pt = new main.Pt({x: main.player.loc.x, y: main.player.loc.y});;
 		var dist, stop = false, cnt = 0;
 		var cos = Math.cos(ang), sin = Math.sin(ang);
-		//console.log("ang: ", to_deg(ang));
-		//console.log("cos: ", cos);
-		//console.log("sin: ", sin);
-		//console.log("------------------------");
-		while (! cur.is_wall && ! stop && cnt < 300 && ! outside_map(cur)) {
-			cnt += 1
+		
+		while (! cur.is_wall && ! stop && ! outside_map(cur)) {
 			temp_pt = next_grid(cos, sin, temp_pt.x, temp_pt.y);
 			cur = main.get_square(temp_pt.x, temp_pt.y, cos, sin);
 			dist = dist = main.get_dist(main.player.loc, temp_pt);
-			//console.log("dist: ", dist);
 			cur.dist = dist;
 			if (dist > main.max_view_dist) {
 				stop = true;
 			}
 		}
 		
-		if (cnt >= 300) {
-			console.log("too many");
-		}
-		else {
-			//console.log("cnt less");
-		}
 		cur.x = temp_pt.x;
 		cur.y = temp_pt.y;
 		
+		// illuminate ray endpoint
 		main.draw_minimap_point(cur, "#76ff00");
 		
 		return cur;
@@ -526,25 +487,17 @@ Main.prototype.get_columns = function() {
 	}
 	
 	function next_grid(run, rise, x, y) {
-		//console.log("run: ", run, " rise: ", rise);
-		if (run == 0) {
-			//console.log("run: ", run);
-		}
-		if (rise == 0) {
-			//console.log("rise: ", rise);
-		}
+		var temp_x, temp_y, whole_x, whole_x_y, whole_y, whole_y_x;
 		
-		// rename to make it clear that we're first calculating deltas then adding orig x,y
-		var whole_x = run >= 0 ? next_whole(x) - x : next_whole_down(x) - x;
-		var whole_x_y = whole_x * (rise/run) + y;
-		whole_x += x;
+		temp_x = run >= 0 ? next_whole(x) - x : next_whole_down(x) - x;
+		temp_y = temp_x * (rise/run);
+		whole_x = temp_x + x;
+		whole_x_y = temp_y + y;
 		
-		var whole_y = rise >= 0 ? next_whole(y) - y : next_whole_down(y) - y;
-		var whole_y_x = whole_y * (run/rise) + x;
-		whole_y += y;
-		
-		//console.log("whole_x: ", whole_x);
-		//console.log("whole_y: ", whole_y);
+		temp_y = rise >= 0 ? next_whole(y) - y : next_whole_down(y) - y;
+		temp_x = temp_y * (run/rise);
+		whole_y = temp_y + y;
+		whole_y_x = temp_x + x;
 		
 		var whole_x_pt = new main.Pt({x: whole_x, y: whole_x_y});
 		var whole_y_pt = new main.Pt({x: whole_y_x, y: whole_y});
@@ -553,14 +506,19 @@ Main.prototype.get_columns = function() {
 		var whole_x_dist = main.get_dist(init_pt, whole_x_pt);
 		var whole_y_dist = main.get_dist(init_pt, whole_y_pt);
 		
-		//console.log("whole_x_dist: ", whole_x_dist);
-		//console.log("whole_y_dist: ", whole_y_dist);
-		
 		var ret = whole_x_dist <= whole_y_dist ? new main.Pt({x: whole_x, y: whole_x_y}) : new main.Pt({x: whole_y_x, y: whole_y});
-		//console.log(ret.toString());
+		// illuminate ray
 		main.draw_minimap_point(ret, "#76ff00");
 		return ret;
 	}
+}
+
+function mean(arr) {
+	function sum_up(tot, n) {
+		return tot + n;
+	}
+	var total = arr.reduce(sum_up);
+	return total / arr.length;
 }
 
 Main.prototype.tick = function() {
@@ -591,8 +549,23 @@ Main.prototype.tick = function() {
 	
 	var now = Date.now();
 	var fps = 1000.0 / (now - main.last_tick);
+	var avg;
 	main.last_tick = now;
-	main.fps_field.innerHTML = fps.toString();
+	
+	main.fps_samples.push(now);
+	
+	// update avg fps if samples have accumulated over 2 seconds
+	if (now - main.fps_samples[0] > 2000) {
+		var i, accum = [];
+		for (i = 1; i < main.fps_samples.length; i++) {
+			accum.push(main.fps_samples[i] - main.fps_samples[i - 1]);
+		}
+		fps = mean(accum);
+		main.fps_field.innerHTML = fps.toFixed(0);
+		main.fps_samples = [];
+	}
+	
+	//main.fps_field.innerHTML = fps.toString();
 	//console.log(columns);
 	//main.pause();
 };
