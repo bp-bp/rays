@@ -14,7 +14,6 @@ function Main(init) {
 	main.fps_samples = [];
 	
 	// constants etc
-	main.focal_length = 0.8;
 	main.fov = Math.PI * 0.4;
 	main.max_view_dist = 20.0;
 	main.num_columns = 100;
@@ -148,11 +147,10 @@ function Main(init) {
 	main.Player = function(init) {
 		var play = this;
 		
-		// both loc and dir are Pt objects. loc is x,y coords on the map
-		// dir is view direction angle in radians
+		// loc is a Pt object, representing x,y coords on the map
 		play.loc = init.loc || null;
-		//this.dir = init.dir || null;
 		
+		// dir is view direction angle in radians
 		var dir;
 		Object.defineProperty(play, "dir", {
 			get: function() {
@@ -171,7 +169,6 @@ function Main(init) {
 					// then convert to a positive angle
 					reduced = (Math.PI * 2.0) + reduced;
 				}
-				
 				dir = reduced;
 			}
 		});
@@ -195,15 +192,24 @@ function Main(init) {
 			return;
 		}
 		
-		//console.log("move");
 		if (main.move_state.forward || main.move_state.backward) {
 			var move_vec = new main.Pt({x: Math.cos(play.dir), y: Math.sin(play.dir)});
 			// given framerate of (hopefully) 30fps
 			move_vec.mul(main.move_speed / 30.0);
 			if (main.move_state.forward) {
 				
-				play.loc.x += move_vec.x;
-				play.loc.y += move_vec.y;
+				var x_move_square = main.get_square(play.loc.x + move_vec.x, play.loc.y, move_vec.x, 0);
+				var y_move_square = main.get_square(play.loc.x, play.loc.y + move_vec.y, 0, move_vec.y);
+				
+				if (!x_move_square.is_wall) {
+					play.loc.x += move_vec.x;
+				}
+				if (!y_move_square.is_wall) {
+					play.loc.y += move_vec.y;
+				}
+				
+				//play.loc.x += move_vec.x;
+				//play.loc.y += move_vec.y;
 			}
 			else if (main.move_state.backward) {
 				play.loc.x -= move_vec.x;
@@ -218,7 +224,6 @@ function Main(init) {
 			else if (main.move_state.turn_right) {
 				play.dir += turn_ang;
 			}
-			//console.log("angle: ", play.dir/Math.PI);
 		}
 	};
 	
@@ -274,13 +279,10 @@ Main.prototype.draw_minimap_line = function(pt1, pt2, color) {
 Main.prototype.draw_minimap = function() {
 	var main = this; 
 	
-	
-	
 	// draw the map image scaled-up on the map canvas
 	main.map_ctx.drawImage(main.map_img, 0, 0, main.map_canvas.width, main.map_canvas.height);
 	
-	// grid
-	
+	// draw the grid
 	var x, y;
 	for (x = 0; x < main.map_img.width; x++) {
 		main.draw_minimap_line(new main.Pt({x: x, y: 0}), new main.Pt({x: x, y: main.map_img.height}), "gray");
@@ -289,9 +291,7 @@ Main.prototype.draw_minimap = function() {
 		}
 	}
 	
-	
 	// now draw player's position
-	//main.draw_minimap_point(main.player.loc, "#f44242");
 	var end_pt = new main.Pt({x: main.player.loc.x + Math.cos(main.player.dir)
 							, y: main.player.loc.y + Math.sin(main.player.dir)});
 	main.draw_minimap_line(main.player.loc, end_pt, "red");
@@ -380,26 +380,22 @@ Main.prototype.draw_column = function(col) {
 	main.view_ctx.fillRect(draw_rect.x, draw_rect.y, draw_rect.width, draw_rect.height);
 };
 
-// parallel-to-wall problem is in here -- when on negative side of wall,
-// rays pointing away from wall will have cos or sin < 0 and check the wrong square
 Main.prototype.get_square = function(x, y, cos, sin) {
 	var main = this;
 	
 	var idx, ret = {};
 	
 	var lookup_x, lookup_y;
-	if (cos <= 0) {
-		lookup_x = Math.ceil(x);
-	}
-	else {
-		lookup_x = Math.floor(x);
-	}
 	
-	if (sin <= 0) {
-		lookup_y = Math.ceil(y);
+	
+	lookup_x = Math.floor(x);
+	lookup_y = Math.floor(y);
+	
+	if (cos < 0 && (x % 1.0 == 0)) {
+		lookup_x -= 1;
 	}
-	else {
-		lookup_y = Math.floor(y);
+	if (sin < 0 && (y % 1.0 == 0)) {
+		lookup_y -= 1;
 	}
 	
 	idx = (lookup_x + (lookup_y * main.map_img.height)) * 4;
@@ -411,6 +407,11 @@ Main.prototype.get_square = function(x, y, cos, sin) {
 	ret.is_wall = !!ret.r;
 	ret.x = x;
 	ret.y = y;
+	
+	if (ret.is_wall) {
+		//console.log("x: ", x, "y: ", y);
+	}
+	
 	return ret;
 };
 
@@ -507,8 +508,10 @@ Main.prototype.get_columns = function() {
 		var whole_y_dist = main.get_dist(init_pt, whole_y_pt);
 		
 		var ret = whole_x_dist <= whole_y_dist ? new main.Pt({x: whole_x, y: whole_x_y}) : new main.Pt({x: whole_y_x, y: whole_y});
+		
 		// illuminate ray
 		main.draw_minimap_point(ret, "#76ff00");
+		
 		return ret;
 	}
 }
@@ -532,9 +535,9 @@ Main.prototype.tick = function() {
 	
 	// clear mini map
 	main.map_ctx.clearRect(0, 0, main.map_canvas.width, main.map_canvas.height);
-	main.map_ctx.fillStyle = "#000000";
-	main.map_ctx.rect(0, 0, main.map_canvas.width, main.map_canvas.height);
-	main.map_ctx.fill();
+	//main.map_ctx.fillStyle = "#000000";
+	//main.map_ctx.rect(0, 0, main.map_canvas.width, main.map_canvas.height);
+	//main.map_ctx.fill();
 	
 	// handle movement
 	main.player.move();
