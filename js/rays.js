@@ -5,9 +5,13 @@ function Main(init) {
 	main.canvas = init.canvas || null;
 	main.map_canvas = init.map_canvas || null;
 	main.view_ctx = main.canvas.getContext("2d");
+	main.view_ctx.view_batched_lines = {}; // keys are colors, values are {pt1, pt2}
+	main.view_ctx.view_batched_rects = {}; // keys are colors, values are Rects
 	main.map_ctx = main.map_canvas.getContext("2d");
 	main.map_ctx.imageSmoothingEnabled = false;
 	main.map_ctx.translate(0.5, 0.5);
+	main.minimap_batched_lines = {}; // keys are colors, values are {pt1, pt2}
+	main.minimap_batched_rects = {}; // keys are colors, values are Rects
 	main.map_img = null; // loaded in Main.load_map()
 	main.last_tick = Date.now();
 	main.fps_field = init.fps_field || null;
@@ -17,7 +21,7 @@ function Main(init) {
 	main.fov = Math.PI * 0.4;
 	main.max_view_dist = 20.0;
 	main.num_columns = 100;
-	main.move_speed = 5.0; // in map units per second
+	main.move_speed = 15.0; // in map units per second
 	main.turn_rate = Math.PI * 0.5; // in radians per second
 	main.wall_color = new Color("#828282");
 	
@@ -111,6 +115,7 @@ function Main(init) {
 			rect.y = init.y;
 		}
 		else {
+			console.log(init);
 			throw new Error("problem in Rect init: x, y, or pt are not present or invalid.");
 		}
 		// now width,height
@@ -196,6 +201,7 @@ function Main(init) {
 			var move_vec = new main.Pt({x: Math.cos(play.dir), y: Math.sin(play.dir)});
 			// given framerate of (hopefully) 30fps
 			move_vec.mul(main.move_speed / 30.0);
+			
 			if (main.move_state.forward) {
 				
 				var x_move_square = main.get_square(play.loc.x + move_vec.x, play.loc.y, move_vec.x, 0);
@@ -207,13 +213,19 @@ function Main(init) {
 				if (!y_move_square.is_wall) {
 					play.loc.y += move_vec.y;
 				}
-				
-				//play.loc.x += move_vec.x;
-				//play.loc.y += move_vec.y;
 			}
 			else if (main.move_state.backward) {
-				play.loc.x -= move_vec.x;
-				play.loc.y -= move_vec.y;
+				var x_move_square = main.get_square(play.loc.x - move_vec.x, play.loc.y, move_vec.x, 0);
+				var y_move_square = main.get_square(play.loc.x, play.loc.y - move_vec.y, 0, move_vec.y);
+				
+				if (!x_move_square.is_wall) {
+					play.loc.x -= move_vec.x;
+				}
+				if (!y_move_square.is_wall) {
+					play.loc.y -= move_vec.y;
+				}
+				//play.loc.x -= move_vec.x;g
+				//play.loc.y -= move_vec.y;
 			}
 		}
 		if (main.move_state.turn_left || main.move_state.turn_right) {
@@ -238,9 +250,104 @@ Main.prototype.draw_point = function(ctx, pt, color) {
 	
 	ctx.beginPath();
 	ctx.fillStyle = color;
-	ctx.fillRect(pt.x, pt.y, 2, 2);
+	
+	ctx.rect(pt.x, pt.y, 2, 2);
+	ctx.fill();
+	
+	//ctx.fillRect(pt.x, pt.y, 2, 2);
 };
 
+Main.prototype.batch_point = function(ctx, pt, color) {
+	var main = this;
+	
+	if (ctx === main.map_ctx) {
+		main.batch_minimap_point(pt, color);
+	}
+	else if (ctx === main.view_ctx) {
+		main.batch_view_point(pt, color);
+	}
+};
+
+Main.prototype.batch_rect = function(ctx, rc, color) {
+	var main = this;
+	
+	if (ctx === main.map_ctx) {
+		main.batch_minimap_
+	}
+};
+
+Main.prototype.batch_minimap_point = function(pt, color) {
+	var main = this;
+	
+	if (main.minimap_batched_rects[color] == undefined) {
+		main.minimap_batched_rects[color] = [];
+	}
+	
+	var res_factor_x = main.map_canvas.width / main.map_img.width;
+	var res_factor_y = main.map_canvas.height / main.map_img.height;
+	var draw_pt = new main.Pt({x: pt.x * res_factor_x, y: pt.y * res_factor_y});
+	main.minimap_batched_rects[color].push(new main.Rect({pt: draw_pt, width: 2, height: 2}));
+};
+
+Main.prototype.draw_batched_minimap_rects = function() {
+	var main = this;
+	
+	Object.keys(main.minimap_batched_rects).forEach(function(col) {
+		main.map_ctx.fillStyle = col;
+		main.map_ctx.beginPath();
+		main.minimap_batched_rects[col].forEach(function(rc) {
+			main.map_ctx.rect(rc.x, rc.y, rc.width, rc.height);
+		});
+		main.map_ctx.fill();
+		main.map_ctx.closePath();
+	});
+	
+	main.minimap_batched_rects = {};
+};
+
+Main.prototype.batch_line = function(ctx, pt1, pt2, color) {
+	var main = this;
+	
+	if (ctx === main.map_ctx) {
+		main.batch_minimap_line(pt1, pt2, color);
+	}
+	else if (ctx === main.view_ctx) {
+		main.batch_view_line(pt1, pt2, color);
+	}
+};
+
+// not actually using this one, including for symmetry/future-proofing
+Main.prototype.batch_view_line = function(pt1, pt2, color) {
+	
+}
+
+Main.prototype.batch_minimap_line = function(pt1, pt2, color) {
+	var main = this;
+	if (main.minimap_batched_lines[color] == undefined) {
+		main.minimap_batched_lines[color] = [];
+	}
+	
+	main.minimap_batched_lines[color].push({pt1: pt1, pt2: pt2});
+};
+
+Main.prototype.draw_batched_minimap_lines = function() {
+	var main = this;
+	
+	Object.keys(main.minimap_batched_lines).forEach(function(col) {
+		main.map_ctx.strokeStyle = col;
+		main.map_ctx.beginPath();
+		main.minimap_batched_lines[col].forEach(function(ln) {
+			main.map_ctx.moveTo(Math.floor(ln.pt1.x), Math.floor(ln.pt1.y));
+			main.map_ctx.lineTo(Math.floor(ln.pt2.x), Math.floor(ln.pt2.y));
+		});
+		main.map_ctx.stroke();
+		main.map_ctx.closePath();
+	});
+	
+	main.minimap_batched_lines = {};
+};
+
+/*
 Main.prototype.draw_line = function(ctx, pt1, pt2, color) {
 	var main = this;
 	
@@ -254,6 +361,7 @@ Main.prototype.draw_line = function(ctx, pt1, pt2, color) {
 	ctx.lineTo(Math.floor(pt2.x), Math.floor(pt2.y));
 	ctx.stroke();
 };
+*/
 
 Main.prototype.draw_minimap_point = function(pt, color) {
 	var main = this;
@@ -273,7 +381,8 @@ Main.prototype.draw_minimap_line = function(pt1, pt2, color) {
 	var draw_pt1 = new main.Pt({x: pt1.x * res_factor_x, y: pt1.y * res_factor_y});
 	var draw_pt2 = new main.Pt({x: pt2.x * res_factor_x, y: pt2.y * res_factor_y});
 	
-	main.draw_line(main.map_ctx, draw_pt1, draw_pt2, color);
+	//main.draw_line(main.map_ctx, draw_pt1, draw_pt2, color);
+	main.batch_minimap_line(draw_pt1, draw_pt2, color);
 };
 
 Main.prototype.draw_minimap = function() {
@@ -295,6 +404,9 @@ Main.prototype.draw_minimap = function() {
 	var end_pt = new main.Pt({x: main.player.loc.x + Math.cos(main.player.dir)
 							, y: main.player.loc.y + Math.sin(main.player.dir)});
 	main.draw_minimap_line(main.player.loc, end_pt, "red");
+	
+	//main.map_ctx.stroke();
+	main.draw_batched_minimap_lines();
 	
 };
 
@@ -376,6 +488,7 @@ Main.prototype.draw_column = function(col) {
 	var dark_factor = 40 * (col.dist / main.max_view_dist);
 	this_color.darken(dark_factor);
 	
+	main.view_ctx.beginPath();
 	main.view_ctx.fillStyle = this_color.toString();
 	main.view_ctx.fillRect(draw_rect.x, draw_rect.y, draw_rect.width, draw_rect.height);
 };
@@ -387,10 +500,11 @@ Main.prototype.get_square = function(x, y, cos, sin) {
 	
 	var lookup_x, lookup_y;
 	
-	
+	// first round down
 	lookup_x = Math.floor(x);
 	lookup_y = Math.floor(y);
 	
+	// bump down one further unit on grid line if we're moving in negative direction
 	if (cos < 0 && (x % 1.0 == 0)) {
 		lookup_x -= 1;
 	}
@@ -398,6 +512,7 @@ Main.prototype.get_square = function(x, y, cos, sin) {
 		lookup_y -= 1;
 	}
 	
+	// look up 
 	idx = (lookup_x + (lookup_y * main.map_img.height)) * 4;
 	ret.r = main.map_data.data[idx];
 	ret.g = main.map_data.data[idx + 1];
@@ -468,7 +583,9 @@ Main.prototype.get_columns = function() {
 		cur.y = temp_pt.y;
 		
 		// illuminate ray endpoint
-		main.draw_minimap_point(cur, "#76ff00");
+		//main.draw_minimap_point(cur, "#76ff00");
+		main.batch_minimap_point(new main.Pt({x: cur.x, y: cur.y}), "#76ff00");
+		main.draw_batched_minimap_rects();
 		
 		return cur;
 	}
@@ -510,7 +627,8 @@ Main.prototype.get_columns = function() {
 		var ret = whole_x_dist <= whole_y_dist ? new main.Pt({x: whole_x, y: whole_x_y}) : new main.Pt({x: whole_y_x, y: whole_y});
 		
 		// illuminate ray
-		main.draw_minimap_point(ret, "#76ff00");
+		//main.draw_minimap_point(ret, "#76ff00");
+		main.batch_minimap_point(new main.Pt({x: ret.x, y: ret.y}), "#76ff00");
 		
 		return ret;
 	}
@@ -597,20 +715,7 @@ Main.prototype.run = function() {
 			console.log("player angle: ", to_deg(main.player.dir));
 			console.log("player loc: " + main.player.loc);
 			
-			//main.int = window.setInterval(main.tick.bind(main), 33);
 			main.resume();
-			
-			/*
-			main.view_ctx.clearRect(0, 0, main.canvas.width, main.canvas.height);
-			main.view_ctx.fillStyle = "#000000";
-			main.view_ctx.rect(0, 0, main.canvas.width, main.canvas.height);
-			main.view_ctx.fill();
-
-			var columns = main.get_columns();
-			columns.forEach(function(col) {
-				main.draw_column(col);
-			});
-			*/
 		}
 	);
 };
