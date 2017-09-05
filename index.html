@@ -5,7 +5,7 @@
 	<title>Rays</title>
 	
 	<script type = "text/javascript" src = "js/lib/es6-promise.auto.min.js"></script>
-	<script type = "text/javascript" src = "js/lib/color.min.js"></script>
+	<script type = "text/javascript" src = "js/lib/color.js"></script>
 	<script type = "text/javascript" src = "js/rays.js"></script>
 	<script type = "text/javascript" src = "js/load.js"></script>
 	
@@ -16,11 +16,12 @@
 
 <html>
 <body onload = "rays_app.run()">
+	<header class = "page-head">
+		<h2>Ray Casting</h2>
+	</header>
 	<div class = "wrapper">
 		<header>
-			<h4>FPS: <span id = "fps_field"></span></h4>
-			<button onclick = "app.pause()">pause</button>
-			<button onclick = "app.resume()">resume</button>
+			<h3>FPS: <span id = "fps_field"></span></h4>
 		</header>
 		<canvas id = "main_canvas" class = "canvas-container" width = "600px" height = "600px"></canvas>
 		<canvas id = "map_canvas" class = "canvas-container" width = "600px" height = "600px"></canvas>

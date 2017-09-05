@@ -3,8 +3,30 @@ html {
 	color: white;
 }
 
+body {
+	font-family: sans-serif;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	margin: 0;
+	padding: 0;
+	color: white;
+}
+h1 {font-size: 6rem;}
+h2 {font-size: 4.5rem;}
+h3 {font-size: 3.6rem;}
+h4 {font-size: 2.4rem;}
+h5 {font-size: 1.6rem;}
+h6 {font-size: 1rem;}
+
 canvas {
 	border: 1px solid gray;
+}
+
+
+.page-head {
+	background-color: black;
+	border-bottom: 1px solid gray;
 }
 
 .wrapper {
@@ -12,5 +34,5 @@ canvas {
 }
 
 .canvas-container {
-	margin-top: 6rem;
+	margin-top: 4rem;
 }

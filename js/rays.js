@@ -1,43 +1,15 @@
+if (typeof module === "object" && module.exports) {
+	var Color = require("color-js");
+	var Promise = require("es6-promise").Promise;
+} 
+else { // otherwise assume these modules are loaded globally
+	var Color = net.brehaut.Color; // color needs special handling
+}
+
 var Rays = (function() {
 	function Main(init) {
 		var main = this;
-
-		// drawing
-		main.canvas = init.canvas || null;
-		main.map_canvas = init.map_canvas || null;
-		main.view_ctx = main.canvas.getContext("2d");
-		main.view_batched_rects = {}; // keys are colors, values are Rects
-		main.map_ctx = main.map_canvas.getContext("2d");
-		main.map_ctx.imageSmoothingEnabled = false;
-		main.map_ctx.translate(0.5, 0.5);
-		main.minimap_batched_lines = {}; // keys are colors, values are {pt1, pt2}
-		main.minimap_batched_rects = {}; // keys are colors, values are Rects
-		main.map_img = null; // loaded in Main.load_map()
-		main.last_tick = Date.now();
-		main.current_tick = Date.now();
-		main.fps_field = init.fps_field || null;
-		main.fps_samples = [];
-
-		// constants etc
-		main.fov = Math.PI * 0.4;
-		main.max_view_dist = 20.0;
-		main.num_columns = 100;
-		main.move_speed = 10.0; // in map units per second
-		main.turn_rate = Math.PI * 0.5; // in radians per second
-		main.wall_color = new Color("#828282");
-		main.map_res_factor_x = null; // these will be filled in once the map is loaded and its dimensions are known
-		main.map_res_factor_y = null; // these will be filled in once the map is loaded and its dimensions are known
-
-		// events
-		document.addEventListener("keydown", main.handle_keypress.bind(main, true), false);
-		document.addEventListener("keyup", main.handle_keypress.bind(main, false), false);
-		main.canvas.addEventListener("touchstart", main.handle_touch.bind(main, true), false);
-		main.canvas.addEventListener("touchend", main.handle_touch.bind(main, false), false);
-
-		// input/movement state 
-		main.move_state = {forward: false, backward: false, turn_left: false, turn_right: false};
-
-		// *********** objects
+		
 		// Pt -- simple x,y container
 		main.Pt = function(init) {
 			var pt = this;
@@ -128,6 +100,7 @@ var Rays = (function() {
 				rect.height = init.height;
 			}
 			else {
+				console.log(init);
 				throw new Error("problem in Rect init: width or height are not present or not numbers.");
 			}
 		};
@@ -242,13 +215,65 @@ var Rays = (function() {
 					play.dir += turn_ang;
 				}
 			}
+			
+			main.needs_draw = true;
 		};
 
-		// app objects
+		// initialize everything
+		main.init(init);
+	}
+	
+	Main.prototype.init = function(init) {
+		var main = this;
+		
+		// drawing
+		main.canvas = init.canvas || null;
+		main.map_canvas = init.map_canvas || null;
+		main.view_ctx = main.canvas.getContext("2d");
+		main.view_batched_rects = {}; // keys are colors, values are Rects
+		main.map_ctx = main.map_canvas.getContext("2d");
+		main.map_ctx.imageSmoothingEnabled = false;
+		main.map_ctx.msImageSmoothingEnabled = false;
+		main.map_ctx.mozImageSmoothingEnabled = false;
+		main.map_ctx.webkitImageSmoothingEnabled = false;
+		main.map_ctx.translate(0.5, 0.5);
+		main.minimap_batched_lines = {}; // keys are colors, values are {pt1, pt2}
+		main.minimap_batched_rects = {}; // keys are colors, values are Rects
+		main.map_img = null; // loaded in Main.load_map()
+		main.last_tick = Date.now();
+		main.current_tick = Date.now();
+		main.fps_field = init.fps_field || null;
+		main.fps_samples = [];
+		main.needs_draw = true; // gets 
+
+		// constants etc
+		main.fov = Math.PI * 0.4;
+		main.max_view_dist = 20.0;
+		main.num_columns = (main.canvas.width / 6);//100;
+		main.move_speed = 10.0; // in map units per second
+		main.turn_rate = Math.PI * 1.0; // in radians per second
+		main.wall_color = new Color("#828282");
+		main.map_res_factor_x = null; // these will be filled in once the map is loaded and its dimensions are known
+		main.map_res_factor_y = null; // these will be filled in once the map is loaded and its dimensions are known
+		
+		// events
+		document.addEventListener("keydown", main.handle_keypress.bind(main, true), false);
+		document.addEventListener("keyup", main.handle_keypress.bind(main, false), false);
+		main.canvas.addEventListener("touchstart", main.handle_touch.bind(main, true), false);
+		main.canvas.addEventListener("touchend", main.handle_touch.bind(main, false), false);
+		window.addEventListener("blur", main.on_blur.bind(main));
+		window.addEventListener("focus", main.on_focus.bind(main));
+		
+		// input/movement state 
+		main.move_state = {forward: false, backward: false, turn_left: false, turn_right: false};
+		
+		// app stuff
 		main.map_data = null;
 		main.int = null;
-		main.player = new main.Player({loc: new main.Pt({x: 2.0, y: 2.0}), dir: Math.PI * 0.25});
-	}
+		main.paused = false;
+		main.blur_paused = false;
+		main.player = new main.Player({loc: new main.Pt({x: 1.0, y: 1.0}), dir: Math.PI * 0.25});
+	};
 
 	Main.prototype.dt = function() {
 		var main = this; 
@@ -355,7 +380,7 @@ var Rays = (function() {
 								, y: main.player.loc.y + Math.sin(main.player.dir)});
 		main.batch_minimap_line(main.player.loc, end_pt, "red");
 
-		//main.map_ctx.stroke();
+		// paint everything to the canvas
 		main.draw_batched_minimap_lines();
 
 	};
@@ -364,45 +389,85 @@ var Rays = (function() {
 		var main = this;
 
 		var elem_rect = main.canvas.getBoundingClientRect();
-		var touch_pt = new main.Pt({	x: Math.round((e.clientX - elem_rect.left) / (elem_rect.right - elem_rect.left) * main.creep_elem.width)
-										, y: Math.round((e.clientY - elem_rect.top) / (elem_rect.bottom - elem_rect.top) * main.creep_elem.height) });
+		var touch_pt = new main.Pt({	x: Math.round((e.clientX - elem_rect.left) / (elem_rect.right - elem_rect.left) * main.canvas.width)
+										, y: Math.round((e.clientY - elem_rect.top) / (elem_rect.bottom - elem_rect.top) * main.canvas.height) });
 		return touch_pt;
 	};
 
-	// incomplete
 	Main.prototype.handle_touch = function(val, e) {
 		var main = this; 
-
-		/*
+		
+		e.preventDefault();
+		
+		if (! val) {
+			main.zero_move_state();
+			return;
+		}
+		
 		var touch = e.touches[0];
 		var touch_pt = main.touch_pos(touch);
-		alert(touch_pt.toString());
-
+		
+		// forward/backward
+		if (touch_pt.y < (main.canvas.height * 0.25)) {
+			main.handle_keypress(val, {code: "KeyW"});
+			return;
+		}
+		else if (touch_pt.y > (main.canvas.height * 0.75)) {
+			main.handle_keypress(val, {code: "KeyS"});
+			return;
+		}
+		
+		// left and right turns
 		if (touch_pt.x < (main.canvas.width * 0.25)) {
-			alert("left");
 			main.handle_keypress(val, {code: "KeyA"});
 		}
 		else if (touch_pt.x > (main.canvas.width * 0.75)) {
-			alert("right");
 			main.handle_keypress(val, {code: "KeyD"});
 		}
-		*/
+		
 	};
 
 	Main.prototype.handle_keypress = function(val, e) {
 		var main = this;
 
-		if (e.code === "KeyW") {
+		if (e.code === "KeyW" || e.key === "w" || e.key === "W") {
 			main.move_state.forward = val;
 		}
-		else if (e.code === "KeyS") {
+		else if (e.code === "KeyS" || e.key === "s" || e.key === "S") {
 			main.move_state.backward = val;
 		}
-		else if (e.code === "KeyA") {
+		else if (e.code === "KeyA" || e.key === "a" || e.key === "A") {
 			main.move_state.turn_left = val;
 		}
-		else if (e.code === "KeyD") {
+		else if (e.code === "KeyD"|| e.key === "d" || e.key === "D") {
 			main.move_state.turn_right = val;
+		}
+	};
+	
+	Main.prototype.zero_move_state = function() {
+		var main = this;
+		
+		main.move_state.forward = false;
+		main.move_state.backward = false;
+		main.move_state.turn_left = false;
+		main.move_state.turn_right = false;
+	};
+	
+	Main.prototype.on_focus = function() {
+		var main = this;
+		
+		if (main.blur_paused) {
+			main.resume();
+			main.blur_paused = false;
+		}
+	};
+	
+	Main.prototype.on_blur = function() {
+		var main = this;
+		
+		if (! main.paused) {
+			main.pause();
+			main.blur_paused = true;
 		}
 	};
 
@@ -423,10 +488,11 @@ var Rays = (function() {
 
 		// set color darkness by distance
 		var this_color = new Color(main.wall_color.toString());
-		var dark_factor = 50 * (col.dist / main.max_view_dist);
-		this_color.darken(dark_factor);
-
-		main.batch_view_rect(draw_rect, this_color);
+		var dark_factor = .9 * (col.dist / main.max_view_dist);
+		this_color = this_color.darkenByRatio(dark_factor);
+		
+		// done, add column to be drawn
+		main.batch_view_rect(draw_rect, this_color.toString());
 	};
 
 	Main.prototype.get_square = function(x, y, cos, sin) {
@@ -480,7 +546,6 @@ var Rays = (function() {
 			mod_ang = c * ang_unit;
 			mod_ang = mod_ang - (main.fov / 2.0);
 			view_ang = main.player.dir + mod_ang;
-			//console.log("view_ang: ", main.to_deg(view_ang));
 			col = nearest_wall(view_ang);
 			col.idx = c;
 			col.ang = view_ang;
@@ -580,34 +645,43 @@ var Rays = (function() {
 
 	Main.prototype.tick = function() {
 		var main = this;
-
+		
+		// deal with time
 		main.last_tick = main.current_tick;
 		main.current_tick = Date.now();
-		// clear view screen
-		main.view_ctx.clearRect(0, 0, main.canvas.width, main.canvas.height);
-		main.view_ctx.fillStyle = "#000000";
-		main.view_ctx.rect(0, 0, main.canvas.width, main.canvas.height);
-		main.view_ctx.fill();
-
-		// clear mini map
-		main.map_ctx.clearRect(0, 0, main.map_canvas.width, main.map_canvas.height);
-
+		
 		// handle movement
 		main.player.move();
-		// draw the minimap with the player's new position
-		main.draw_minimap();
+		
+		if (main.needs_draw) {
+			// clear view screen
+			main.view_ctx.clearRect(0, 0, main.canvas.width, main.canvas.height);
+			main.view_ctx.fillStyle = "#000000";
+			main.view_ctx.rect(0, 0, main.canvas.width, main.canvas.height);
+			main.view_ctx.fill();
 
-		// draw our columns in the view screen
-		var columns = main.get_columns();
-		columns.forEach(function(col) {
-			main.draw_column(col);
-		});
-		main.draw_batched_view_rects();
+			// clear mini map
+			main.map_ctx.clearRect(0, 0, main.map_canvas.width, main.map_canvas.height);
+
+			// move was here
+
+			// draw the minimap with the player's new position
+			main.draw_minimap();
+
+			// draw our columns in the view screen
+			var columns = main.get_columns();
+			columns.forEach(function(col) {
+				main.draw_column(col);
+			});
+			main.draw_batched_view_rects();
+			
+			main.needs_draw = false;
+		}
 
 		main.fps_samples.push(main.current_tick);
 
-		// update avg fps if samples have accumulated over 2 seconds
-		if (main.current_tick - main.fps_samples[0] > 2000) {
+		// update avg fps if samples have accumulated over .5 seconds
+		if (main.current_tick - main.fps_samples[0] > 500) {
 			var i, accum = [];
 			for (i = 1; i < main.fps_samples.length; i++) {
 				accum.push(main.fps_samples[i] - main.fps_samples[i - 1]);
@@ -622,16 +696,18 @@ var Rays = (function() {
 	Main.prototype.pause = function() {
 		var main = this;
 
-		console.log("pausing");
 		window.clearInterval(main.int);
 		main.int = null;
+		main.paused = true;
+		main.fps_field.innerHTML = "&mdash;";
 	};
 
 	Main.prototype.resume = function() {
 		var main = this;
 
-		console.log("resuming");
-		main.int = window.setInterval(main.tick.bind(main), 25); // lock to 40 fps
+		main.int = window.setInterval(main.tick.bind(main), 33); // lock to 30 fps
+		main.paused = false;
+		main.fps_field.innerHTML = "";
 	};
 
 	Main.prototype.load_map = function(url) {
@@ -639,13 +715,12 @@ var Rays = (function() {
 
 		var temp = document.createElement("canvas");
 		var temp_ctx = temp.getContext("2d");
-		//var map = main.map_canvas.getContext("2d");
 		var img_data;
 
 		main.map_img = new Image();
 		main.map_img.src = url;
 
-		var img_data_prom = new Promise((resolve, reject) => {
+		var img_data_prom = new Promise(function (resolve, reject) {
 			main.map_img.onload = function() {
 				// grab data from image
 				temp_ctx.drawImage(this, 0, 0);
@@ -685,17 +760,24 @@ var Rays = (function() {
 		main.load_map("map.png").then(
 			// start stuff running
 			function() {
-				console.log("player angle: ", main.to_deg(main.player.dir));
-				console.log("player loc: " + main.player.loc);
-
 				main.resume();
 			}
 		);
 	};
 	
 	// expose
+	var app;
 	return {app: function(init) {
-			return new Main(init);
+		if (!app) {
+			app = new Main(init);
 		}
-	};
+		else if (init != undefined) {
+			app.init(init);
+		}
+		return app;
+	}};
 })();
+
+if (typeof module === "object" && module.exports) {
+	module.exports = Rays;
+}
