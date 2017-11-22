@@ -104,6 +104,28 @@ var Rays = (function() {
 				throw new Error("problem in Rect init: width or height are not present or not numbers.");
 			}
 		};
+		
+		// should be getters/setters, just getters right now
+		main.Rect.prototype.top = function() {
+			var rect = this;
+			
+			return rect.y;
+		};
+		main.Rect.prototype.bottom = function() {
+			var rect = this;
+			
+			return rect.y + rect.height;
+		};
+		main.Rect.prototype.left = function() {
+			var rect = this;
+			
+			return rect.x;
+		};
+		main.Rect.prototype.right = function() {
+			var rect = this;
+			
+			return rect.x + rect.width;
+		};
 
 		// getter/setter, couple of different signatures here
 		main.Rect.prototype.center = function() {
@@ -230,7 +252,8 @@ var Rays = (function() {
 		main.canvas = init.canvas || null;
 		main.map_canvas = init.map_canvas || null;
 		main.view_ctx = main.canvas.getContext("2d");
-		main.view_batched_rects = {}; // keys are colors, values are Rects
+		main.view_batched_rects = {}; // for solid draw mode -- keys are colors, values are Rects
+		main.view_batched_edges = {}; // for edge draw mode -- keys are squares...
 		main.map_ctx = main.map_canvas.getContext("2d");
 		main.map_ctx.imageSmoothingEnabled = false;
 		main.map_ctx.msImageSmoothingEnabled = false;
@@ -275,13 +298,15 @@ var Rays = (function() {
 		main.paused = false;
 		main.blur_paused = false;
 		main.player = new main.Player({loc: new main.Pt({x: 1.0, y: 1.0}), dir: Math.PI * 0.25});
+		main.draw_mode = "edges"; // options are "solid" and "edges"
 	};
 
 	Main.prototype.dt = function() {
 		var main = this; 
 		return main.current_tick - main.last_tick;
 	};
-
+	
+	// for solid mode
 	Main.prototype.batch_view_rect = function(rc, color) {
 		var main = this;
 
@@ -289,6 +314,54 @@ var Rays = (function() {
 			main.view_batched_rects[color] = [];
 		}
 		main.view_batched_rects[color].push(rc);
+	};
+	
+	// for edge mode -- should I specify color here?
+	Main.prototype.batch_view_edge = function(rc, col, color) {
+		var main = this;
+		
+		var sq_key = col.square_pt.toString();
+		if (main.view_batched_edges[sq_key]) {
+			main.view_batched_edges[sq_key].tops.push(new main.Pt({x: rc.left(), y: rc.top()}));
+			main.view_batched_edges[sq_key].bottoms.push(new main.Pt({x: rc.left(), y: rc.bottom()}));
+		}
+		else {
+			main.view_batched_edges[sq_key] = {tops: [], bottoms: []};
+			main.view_batched_edges[sq_key].tops.push(new main.Pt({x: rc.left(), y: rc.top()}));
+			main.view_batched_edges[sq_key].bottoms.push(new main.Pt({x: rc.left(), y: rc.bottom()}));
+		}
+	}
+	
+	Main.prototype.draw_batched_view_edges = function() {
+		var main = this;
+		
+		// for each square
+		Object.keys(main.view_batched_edges).forEach(function(sq_key) {
+			main.view_ctx.strokeStyle = "white";
+			
+			// first tops
+			var first_pt = new main.Pt({x: main.view_batched_edges[sq_key].tops[0].x, y: main.view_batched_edges[sq_key].tops[0].y});
+			main.view_ctx.beginPath();
+			main.view_ctx.moveTo(first_pt.x, first_pt.y);
+			var i;
+			for (i = 1; i < main.view_batched_edges[sq_key].tops.length; i++) {
+				main.view_ctx.lineTo(main.view_batched_edges[sq_key].tops[i].x, main.view_batched_edges[sq_key].tops[i].y);
+			}
+			main.view_ctx.closePath();
+			main.view_ctx.stroke();
+			
+			// now bottoms
+			first_pt = new main.Pt({x: main.view_batched_edges[sq_key].bottoms[0].x, y: main.view_batched_edges[sq_key].bottoms[0].y});
+			main.view_ctx.beginPath();
+			main.view_ctx.moveTo(first_pt.x, first_pt.y);
+			for (i = 1; i < main.view_batched_edges[sq_key].bottoms.length; i++) {
+				main.view_ctx.lineTo(main.view_batched_edges[sq_key].bottoms[i].x, main.view_batched_edges[sq_key].bottoms[i].y);
+			}
+			main.view_ctx.closePath();
+			main.view_ctx.stroke();
+		});
+		
+		main.view_batched_edges = {};
 	};
 
 	Main.prototype.draw_batched_view_rects = function() {
@@ -495,7 +568,12 @@ var Rays = (function() {
 		this_color = this_color.darken(dark_factor);
 		
 		// done, add column to be drawn
-		main.batch_view_rect(draw_rect, this_color.toString());
+		if (main.draw_mode === "solid") {
+			main.batch_view_rect(draw_rect, this_color.toString());
+		}
+		else if (main.draw_mode === "edges") {
+			main.batch_view_edge(draw_rect, col, "white");
+		}
 	};
 
 	Main.prototype.get_square = function(x, y, cos, sin) {
@@ -526,7 +604,10 @@ var Rays = (function() {
 		ret.is_wall = !!ret.r;
 		ret.x = x;
 		ret.y = y;
-
+		ret.square_x = lookup_x;
+		ret.square_y = lookup_y;
+		ret.square_pt = new main.Pt({x: lookup_x, y: lookup_y});
+		
 		return ret;
 	};
 
@@ -568,7 +649,6 @@ var Rays = (function() {
 			var dist, stop = false, cnt = 0;
 			
 			var cos, sin;
-			
 			if (main.cos_calls[ang] != undefined) {
 				cos = main.cos_calls[ang];
 			}
@@ -576,7 +656,6 @@ var Rays = (function() {
 				cos = Math.cos(ang);
 				main.cos_calls[ang] = cos;
 			}
-			
 			if (main.sin_calls[ang] != undefined) {
 				sin = main.sin_calls[ang];
 			}
@@ -643,7 +722,7 @@ var Rays = (function() {
 
 			// illuminate ray
 			main.batch_minimap_point(new main.Pt({x: ret.x, y: ret.y}), "#76ff00");
-			main.batch
+			//main.batch
 
 			return ret;
 		}
@@ -694,7 +773,12 @@ var Rays = (function() {
 			columns.forEach(function(col) {
 				main.draw_column(col);
 			});
-			main.draw_batched_view_rects();
+			if (main.draw_mode === "solid") {
+				main.draw_batched_view_rects();
+			}
+			else if (main.draw_mode === "edges") {
+				main.draw_batched_view_edges();
+			}
 			
 			main.needs_draw = false;
 		}
