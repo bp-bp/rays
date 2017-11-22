@@ -3,7 +3,7 @@ if (typeof module === "object" && module.exports) {
 	var Promise = require("es6-promise").Promise;
 } 
 else { // otherwise assume these modules are loaded globally
-	var Color = net.brehaut.Color; // color needs special handling
+	var Color = tinycolor; // color needs special handling
 }
 
 var Rays = (function() {
@@ -244,7 +244,8 @@ var Rays = (function() {
 		main.current_tick = Date.now();
 		main.fps_field = init.fps_field || null;
 		main.fps_samples = [];
-		main.needs_draw = true; // gets 
+		main.needs_draw = true; 
+		main.anim = null; // return value from requestAnimationFrame
 
 		// constants etc
 		main.fov = Math.PI * 0.4;
@@ -255,6 +256,8 @@ var Rays = (function() {
 		main.wall_color = new Color("#828282");
 		main.map_res_factor_x = null; // these will be filled in once the map is loaded and its dimensions are known
 		main.map_res_factor_y = null; // these will be filled in once the map is loaded and its dimensions are known
+		main.cos_calls = {}; // caches calls to Math.cos, keys are angles and values are Math.cos(angle)
+		main.sin_calls = {}; // same for Math.sin
 		
 		// events
 		document.addEventListener("keydown", main.handle_keypress.bind(main, true), false);
@@ -269,7 +272,6 @@ var Rays = (function() {
 		
 		// app stuff
 		main.map_data = null;
-		main.int = null;
 		main.paused = false;
 		main.blur_paused = false;
 		main.player = new main.Player({loc: new main.Pt({x: 1.0, y: 1.0}), dir: Math.PI * 0.25});
@@ -367,11 +369,11 @@ var Rays = (function() {
 		main.map_ctx.drawImage(main.map_img, 0, 0, main.map_canvas.width, main.map_canvas.height);
 
 		// draw the grid
-		var x, y;
-		for (x = 0; x < main.map_img.width; x++) {
+		var x, y; // lower bound 1, don't draw borders
+		for (x = 1; x < main.map_img.width; x++) {
 			main.batch_minimap_line(new main.Pt({x: x, y: 0}), new main.Pt({x: x, y: main.map_img.height}), "gray");
 			for (y = 0; y < main.map_img.height; y++) {
-				main.batch_minimap_line(new main.Pt({x: 0, y: y}), new main.Pt({x: main.map_img.width, y: y}), "gray");
+				main.batch_minimap_line(new main.Pt({x: 0, y: y}), new main.Pt({x: main.map_img.width, y: y}), (y === 0 ? "black" : "gray"));
 			}
 		}
 
@@ -453,21 +455,22 @@ var Rays = (function() {
 		main.move_state.turn_right = false;
 	};
 	
-	Main.prototype.on_focus = function() {
-		var main = this;
-		
-		if (main.blur_paused) {
-			main.resume();
-			main.blur_paused = false;
-		}
-	};
-	
+	// pause and resume the animation when tab loses/gains focus
 	Main.prototype.on_blur = function() {
 		var main = this;
 		
 		if (! main.paused) {
 			main.pause();
 			main.blur_paused = true;
+		}
+	};
+	
+	Main.prototype.on_focus = function() {
+		var main = this;
+		
+		if (main.blur_paused) {
+			main.resume();
+			main.blur_paused = false;
 		}
 	};
 
@@ -487,9 +490,9 @@ var Rays = (function() {
 		draw_rect.center(center);
 
 		// set color darkness by distance
-		var this_color = new Color(main.wall_color.toString());
-		var dark_factor = .9 * (col.dist / main.max_view_dist);
-		this_color = this_color.darkenByRatio(dark_factor);
+		var this_color = main.wall_color.clone();//new Color(main.wall_color.toString());
+		var dark_factor = 100 * .9 * (col.dist / main.max_view_dist);
+		this_color = this_color.darken(dark_factor);
 		
 		// done, add column to be drawn
 		main.batch_view_rect(draw_rect, this_color.toString());
@@ -563,7 +566,24 @@ var Rays = (function() {
 			var cur = {ang: ang, is_wall: false};
 			var temp_pt = new main.Pt({x: main.player.loc.x, y: main.player.loc.y});;
 			var dist, stop = false, cnt = 0;
-			var cos = Math.cos(ang), sin = Math.sin(ang);
+			
+			var cos, sin;
+			
+			if (main.cos_calls[ang] != undefined) {
+				cos = main.cos_calls[ang];
+			}
+			else {
+				cos = Math.cos(ang);
+				main.cos_calls[ang] = cos;
+			}
+			
+			if (main.sin_calls[ang] != undefined) {
+				sin = main.sin_calls[ang];
+			}
+			else {
+				sin = Math.sin(ang);
+				main.sin_calls[ang] = sin;
+			}
 
 			while (! cur.is_wall && ! stop && ! outside_map(cur)) {
 				temp_pt = next_grid(cos, sin, temp_pt.x, temp_pt.y);
@@ -622,7 +642,6 @@ var Rays = (function() {
 			var ret = whole_x_dist <= whole_y_dist ? new main.Pt({x: whole_x, y: whole_x_y}) : new main.Pt({x: whole_y_x, y: whole_y});
 
 			// illuminate ray
-			//main.draw_minimap_point(ret, "#76ff00");
 			main.batch_minimap_point(new main.Pt({x: ret.x, y: ret.y}), "#76ff00");
 			main.batch
 
@@ -642,17 +661,19 @@ var Rays = (function() {
 	Main.prototype.to_deg = function(rad) {
 		return (180.0/Math.PI) * rad;
 	};
-
-	Main.prototype.tick = function() {
+	
+	// callback for requestAnimationFrame
+	Main.prototype.tick = function(time) {
 		var main = this;
 		
 		// deal with time
 		main.last_tick = main.current_tick;
-		main.current_tick = Date.now();
+		main.current_tick = time;
 		
 		// handle movement
 		main.player.move();
 		
+		// handle drawing
 		if (main.needs_draw) {
 			// clear view screen
 			main.view_ctx.clearRect(0, 0, main.canvas.width, main.canvas.height);
@@ -677,7 +698,8 @@ var Rays = (function() {
 			
 			main.needs_draw = false;
 		}
-
+		
+		// fps stuff
 		main.fps_samples.push(main.current_tick);
 
 		// update avg fps if samples have accumulated over .5 seconds
@@ -690,24 +712,30 @@ var Rays = (function() {
 			main.fps_field.innerHTML = fps.toFixed(0);
 			main.fps_samples = [];
 		}
-
+		
+		// proceed to next tick
+		if (! main.paused) {
+			main.anim = window.requestAnimationFrame(main.tick.bind(main));
+		}
+		else {
+			window.cancelAnimationFrame(main.anim);
+		}
 	};
 
 	Main.prototype.pause = function() {
 		var main = this;
-
-		window.clearInterval(main.int);
-		main.int = null;
+		
 		main.paused = true;
 		main.fps_field.innerHTML = "&mdash;";
 	};
 
 	Main.prototype.resume = function() {
 		var main = this;
-
-		main.int = window.setInterval(main.tick.bind(main), 33); // lock to 30 fps
+		
 		main.paused = false;
 		main.fps_field.innerHTML = "";
+		
+		main.anim = window.requestAnimationFrame(main.tick.bind(main));
 	};
 
 	Main.prototype.load_map = function(url) {
