@@ -306,6 +306,18 @@ var Rays = (function() {
 		return main.current_tick - main.last_tick;
 	};
 	
+	Main.prototype.solid_mode = function() {
+		var main = this;
+		main.draw_mode = "solid";
+		main.needs_draw = true;
+	};
+	
+	Main.prototype.edges_mode = function() {
+		var main = this;
+		main.draw_mode = "edges";
+		main.needs_draw = true;
+	};
+	
 	// for solid mode
 	Main.prototype.batch_view_rect = function(rc, color) {
 		var main = this;
@@ -316,7 +328,7 @@ var Rays = (function() {
 		main.view_batched_rects[color].push(rc);
 	};
 	
-	// for edge mode -- should I specify color here?
+	// for edge mode -- should I even specify color here?
 	Main.prototype.batch_view_edge = function(rc, col, color) {
 		var main = this;
 		
@@ -338,6 +350,10 @@ var Rays = (function() {
 		// for each square
 		Object.keys(main.view_batched_edges).forEach(function(sq_key) {
 			main.view_ctx.strokeStyle = "white";
+			//main.view_ctx.lineWidth = 6;
+			
+			// rejigger last pt in tops and bottoms 
+			//main.view_batched_edges[sq_key].tops[main.view_batched_edges[sq_key].tops.length - 1].x += 6;
 			
 			// first tops
 			var first_pt = new main.Pt({x: main.view_batched_edges[sq_key].tops[0].x, y: main.view_batched_edges[sq_key].tops[0].y});
@@ -347,16 +363,11 @@ var Rays = (function() {
 			for (i = 1; i < main.view_batched_edges[sq_key].tops.length; i++) {
 				main.view_ctx.lineTo(main.view_batched_edges[sq_key].tops[i].x, main.view_batched_edges[sq_key].tops[i].y);
 			}
-			main.view_ctx.closePath();
-			main.view_ctx.stroke();
-			
-			// now bottoms
-			first_pt = new main.Pt({x: main.view_batched_edges[sq_key].bottoms[0].x, y: main.view_batched_edges[sq_key].bottoms[0].y});
-			main.view_ctx.beginPath();
-			main.view_ctx.moveTo(first_pt.x, first_pt.y);
-			for (i = 1; i < main.view_batched_edges[sq_key].bottoms.length; i++) {
+			// now bottoms, backwards
+			for (i = main.view_batched_edges[sq_key].bottoms.length - 1; i >= 0; i--) {
 				main.view_ctx.lineTo(main.view_batched_edges[sq_key].bottoms[i].x, main.view_batched_edges[sq_key].bottoms[i].y);
 			}
+			main.view_ctx.lineTo(first_pt.x, first_pt.y);
 			main.view_ctx.closePath();
 			main.view_ctx.stroke();
 		});
@@ -532,7 +543,7 @@ var Rays = (function() {
 	Main.prototype.on_blur = function() {
 		var main = this;
 		
-		if (! main.paused) {
+		if (! main.blur_paused) {
 			main.pause();
 			main.blur_paused = true;
 		}
@@ -810,6 +821,7 @@ var Rays = (function() {
 		var main = this;
 		
 		main.paused = true;
+		window.cancelAnimationFrame(main.anim);
 		main.fps_field.innerHTML = "&mdash;";
 	};
 
@@ -819,6 +831,7 @@ var Rays = (function() {
 		main.paused = false;
 		main.fps_field.innerHTML = "";
 		
+		console.log("anim: ", main.anim);
 		main.anim = window.requestAnimationFrame(main.tick.bind(main));
 	};
 
