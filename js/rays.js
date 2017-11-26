@@ -272,7 +272,7 @@ var Rays = (function() {
 
 		// constants etc
 		main.fov = Math.PI * 0.4;
-		main.max_view_dist = 20.0;
+		main.max_view_dist = 100.0;//20.0;
 		main.num_columns = (main.canvas.width / 6);//100;
 		main.move_speed = 10.0; // in map units per second
 		main.turn_rate = Math.PI * 1.0; // in radians per second
@@ -641,7 +641,7 @@ var Rays = (function() {
 			mod_ang = c * ang_unit;
 			mod_ang = mod_ang - (main.fov / 2.0);
 			view_ang = main.player.dir + mod_ang;
-			col = nearest_wall(view_ang);
+			col = main.cast_ray(view_ang);
 			col.idx = c;
 			col.ang = view_ang;
 			col.mod_ang = mod_ang;
@@ -649,12 +649,13 @@ var Rays = (function() {
 		}
 
 		return columns;
-
+		
+		/*
 		function outside_map(pt) {
 			return (pt.x < 0 || pt.y < 0) || (pt.x > main.map_img.width || pt.y > main.map_img.height);
 		}
 
-		function nearest_wall(ang) {
+		function cast_ray(ang) {
 			var cur = {ang: ang, is_wall: false};
 			var temp_pt = new main.Pt({x: main.player.loc.x, y: main.player.loc.y});;
 			var dist, stop = false, cnt = 0;
@@ -733,10 +734,113 @@ var Rays = (function() {
 
 			// illuminate ray
 			main.batch_minimap_point(new main.Pt({x: ret.x, y: ret.y}), "#76ff00");
-			//main.batch
 
 			return ret;
 		}
+		*/
+	};
+
+	Main.prototype.cast_ray = function(ang) {
+		var main = this;
+		
+		var cur = {ang: ang, is_wall: false, grid_points: []};
+		//console.log(cur.grid_points);
+		var temp_pt = new main.Pt({x: main.player.loc.x, y: main.player.loc.y});;
+		var dist, stop = false, cnt = 0;
+
+		var cos, sin;
+		if (main.cos_calls[ang] != undefined) {
+			cos = main.cos_calls[ang];
+		}
+		else {
+			cos = Math.cos(ang);
+			main.cos_calls[ang] = cos;
+		}
+		if (main.sin_calls[ang] != undefined) {
+			sin = main.sin_calls[ang];
+		}
+		else {
+			sin = Math.sin(ang);
+			main.sin_calls[ang] = sin;
+		}
+
+		while (! cur.is_wall && ! stop && ! main.outside_map(cur)) {
+			temp_pt = main.next_grid(cos, sin, temp_pt.x, temp_pt.y);
+			//cur.grid_points.push(temp_pt);
+			cur = main.get_square(temp_pt.x, temp_pt.y, cos, sin);
+			dist = dist = main.get_dist(main.player.loc, temp_pt);
+			cur.dist = dist;
+			if (dist > main.max_view_dist) {
+				stop = true;
+			}
+		}
+
+		cur.x = temp_pt.x;
+		cur.y = temp_pt.y;
+
+		// illuminate ray endpoint
+		//main.batch_minimap_point(new main.Pt({x: cur.x, y: cur.y}), "#76ff00");
+		//main.draw_batched_minimap_rects();
+		cur.grid_points.forEach(function(pt) {
+			main.batch_minimap_point(new main.Pt({x: pt.x, y: pt.y}));
+		});
+		main.draw_batched_minimap_rects();
+
+		return cur;
+	};
+	
+	Main.prototype.outside_map = function(pt) {
+		var main = this;
+		
+		return (pt.x < 0 || pt.y < 0) || (pt.x > main.map_img.width || pt.y > main.map_img.height);
+	};
+	
+	Main.prototype.next_whole = function(num) {
+		var main = this;
+		
+		if (num % 1.0 === 0) {
+			return num + 1.0;
+		}
+		return Math.ceil(num);
+	};
+
+	Main.prototype.next_whole_down = function(num) {
+		var main = this;
+		
+		if (num % 1.0 === 0) {
+			return num - 1.0;
+		}
+		return Math.floor(num);
+	};
+
+	Main.prototype.next_grid = function(run, rise, x, y) {
+		var main = this;
+		
+		var temp_x, temp_y, whole_x, whole_x_y, whole_y, whole_y_x;
+
+		temp_x = run >= 0 ? main.next_whole(x) - x : main.next_whole_down(x) - x;
+		temp_y = temp_x * (rise/run);
+		whole_x = temp_x + x;
+		whole_x_y = temp_y + y;
+
+		temp_y = rise >= 0 ? main.next_whole(y) - y : main.next_whole_down(y) - y;
+		temp_x = temp_y * (run/rise);
+		whole_y = temp_y + y;
+		whole_y_x = temp_x + x;
+
+		var whole_x_pt = new main.Pt({x: whole_x, y: whole_x_y});
+		var whole_y_pt = new main.Pt({x: whole_y_x, y: whole_y});
+
+		var init_pt = new main.Pt({x: x, y: y});
+		var whole_x_dist = main.get_dist(init_pt, whole_x_pt);
+		var whole_y_dist = main.get_dist(init_pt, whole_y_pt);
+
+		var ret = whole_x_dist <= whole_y_dist ? new main.Pt({x: whole_x, y: whole_x_y}) : new main.Pt({x: whole_y_x, y: whole_y});
+
+		// illuminate ray
+		//main.batch_minimap_point(new main.Pt({x: ret.x, y: ret.y}), "#76ff00");
+
+		return ret;
 	};
 
 	/* little utilities */
@@ -774,10 +878,8 @@ var Rays = (function() {
 			// clear mini map
 			main.map_ctx.clearRect(0, 0, main.map_canvas.width, main.map_canvas.height);
 
-			// move was here
-
 			// draw the minimap with the player's new position
-			main.draw_minimap();
+			//main.draw_minimap();
 
 			// draw our columns in the view screen
 			var columns = main.get_columns();
@@ -882,7 +984,7 @@ var Rays = (function() {
 	Main.prototype.run = function() {
 		var main = this;
 
-		main.load_map("map.png").then(
+		main.load_map("big_map.png").then(
 			// start stuff running
 			function() {
 				main.resume();
