@@ -251,6 +251,7 @@ var Rays = (function() {
 		// drawing
 		main.canvas = init.canvas || null;
 		main.map_canvas = init.map_canvas || null;
+		main.map_bg_canvas = init.map_bg_canvas || null;
 		main.view_ctx = main.canvas.getContext("2d");
 		main.view_batched_rects = {}; // for solid draw mode -- keys are colors, values are Rects
 		main.view_batched_edges = {}; // for edge draw mode -- keys are squares...
@@ -260,6 +261,12 @@ var Rays = (function() {
 		main.map_ctx.mozImageSmoothingEnabled = false;
 		main.map_ctx.webkitImageSmoothingEnabled = false;
 		main.map_ctx.translate(0.5, 0.5);
+		main.map_bg_ctx = main.map_bg_canvas.getContext("2d");
+		main.map_bg_ctx.imageSmoothingEnabled = false;
+		main.map_bg_ctx.msImageSmoothingEnabled = false;
+		main.map_bg_ctx.mozImageSmoothingEnabled = false;
+		main.map_bg_ctx.webkitImageSmoothingEnabled = false;
+		main.map_bg_ctx.translate(0.5, 0.5);
 		main.minimap_batched_lines = {}; // keys are colors, values are {pt1, pt2}
 		main.minimap_batched_rects = {}; // keys are colors, values are Rects
 		main.map_img = null; // loaded in Main.load_map()
@@ -350,10 +357,6 @@ var Rays = (function() {
 		// for each square
 		Object.keys(main.view_batched_edges).forEach(function(sq_key) {
 			main.view_ctx.strokeStyle = "white";
-			//main.view_ctx.lineWidth = 6;
-			
-			// rejigger last pt in tops and bottoms 
-			//main.view_batched_edges[sq_key].tops[main.view_batched_edges[sq_key].tops.length - 1].x += 6;
 			
 			// first tops
 			var first_pt = new main.Pt({x: main.view_batched_edges[sq_key].tops[0].x, y: main.view_batched_edges[sq_key].tops[0].y});
@@ -363,10 +366,12 @@ var Rays = (function() {
 			for (i = 1; i < main.view_batched_edges[sq_key].tops.length; i++) {
 				main.view_ctx.lineTo(main.view_batched_edges[sq_key].tops[i].x, main.view_batched_edges[sq_key].tops[i].y);
 			}
+			
 			// now bottoms, backwards
 			for (i = main.view_batched_edges[sq_key].bottoms.length - 1; i >= 0; i--) {
 				main.view_ctx.lineTo(main.view_batched_edges[sq_key].bottoms[i].x, main.view_batched_edges[sq_key].bottoms[i].y);
 			}
+			// one last line back up to the first point
 			main.view_ctx.lineTo(first_pt.x, first_pt.y);
 			main.view_ctx.closePath();
 			main.view_ctx.stroke();
@@ -389,7 +394,8 @@ var Rays = (function() {
 		});
 		main.view_batched_rects = {};
 	};
-
+	
+	// minimap drawing functions
 	Main.prototype.batch_minimap_point = function(pt, color) {
 		var main = this;
 
@@ -449,10 +455,12 @@ var Rays = (function() {
 	Main.prototype.draw_minimap = function() {
 		var main = this; 
 
-		// draw the map image scaled-up on the map canvas
-		main.map_ctx.drawImage(main.map_img, 0, 0, main.map_canvas.width, main.map_canvas.height);
+		// draw the map image scaled-up on the map background canvas
+		main.map_bg_ctx.clearRect(0, 0, main.map_bg_canvas.width, main.map_bg_canvas.height);
+		//main.map_bg_ctx.drawImage(main.map_img, 0, 0, main.map_bg_canvas.width, main.map_bg_canvas.height);
 
-		// draw the grid
+		// draw the grid -- skippiing the grid for now
+		/*
 		var x, y; // lower bound 1, don't draw borders
 		for (x = 1; x < main.map_img.width; x++) {
 			main.batch_minimap_line(new main.Pt({x: x, y: 0}), new main.Pt({x: x, y: main.map_img.height}), "gray");
@@ -460,8 +468,8 @@ var Rays = (function() {
 				main.batch_minimap_line(new main.Pt({x: 0, y: y}), new main.Pt({x: main.map_img.width, y: y}), (y === 0 ? "black" : "gray"));
 			}
 		}
-
-		// now draw player's position
+		*/
+		// now draw player's position on the main map canvas
 		var end_pt = new main.Pt({x: main.player.loc.x + Math.cos(main.player.dir)
 								, y: main.player.loc.y + Math.sin(main.player.dir)});
 		main.batch_minimap_line(main.player.loc, end_pt, "red");
@@ -743,7 +751,7 @@ var Rays = (function() {
 	Main.prototype.cast_ray = function(ang) {
 		var main = this;
 		
-		var cur = {ang: ang, is_wall: false, grid_points: []};
+		var cur = {ang: ang, is_wall: false}, grid_points = [];
 		//console.log(cur.grid_points);
 		var temp_pt = new main.Pt({x: main.player.loc.x, y: main.player.loc.y});;
 		var dist, stop = false, cnt = 0;
@@ -766,7 +774,7 @@ var Rays = (function() {
 
 		while (! cur.is_wall && ! stop && ! main.outside_map(cur)) {
 			temp_pt = main.next_grid(cos, sin, temp_pt.x, temp_pt.y);
-			//cur.grid_points.push(temp_pt);
+			grid_points.push(temp_pt);
 			cur = main.get_square(temp_pt.x, temp_pt.y, cos, sin);
 			dist = dist = main.get_dist(main.player.loc, temp_pt);
 			cur.dist = dist;
@@ -777,15 +785,9 @@ var Rays = (function() {
 
 		cur.x = temp_pt.x;
 		cur.y = temp_pt.y;
-
-		// illuminate ray endpoint
-		//main.batch_minimap_point(new main.Pt({x: cur.x, y: cur.y}), "#76ff00");
-		//main.draw_batched_minimap_rects();
-		cur.grid_points.forEach(function(pt) {
-			main.batch_minimap_point(new main.Pt({x: pt.x, y: pt.y}));
-		});
-		main.draw_batched_minimap_rects();
-
+		grid_points.push(new main.Pt({x: cur.x, y: cur.y}));
+		cur.grid_points = grid_points;
+		
 		return cur;
 	};
 	
@@ -879,13 +881,20 @@ var Rays = (function() {
 			main.map_ctx.clearRect(0, 0, main.map_canvas.width, main.map_canvas.height);
 
 			// draw the minimap with the player's new position
-			//main.draw_minimap();
+			main.draw_minimap();
 
 			// draw our columns in the view screen
 			var columns = main.get_columns();
 			columns.forEach(function(col) {
 				main.draw_column(col);
+				// batch up minimap draw calls
+				col.grid_points.forEach(function(g) {
+					main.batch_minimap_point(g, "#76ff00");
+				});
 			});
+			// draw minimap points
+			main.draw_batched_minimap_rects();
+			
 			if (main.draw_mode === "solid") {
 				main.draw_batched_view_rects();
 			}

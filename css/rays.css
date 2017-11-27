@@ -20,7 +20,7 @@ h5 {font-size: 1.6rem;}
 h6 {font-size: 1rem;}
 
 canvas {
-	border: 1px solid gray;
+	/*border: 1px solid gray;*/
 }
 
 
@@ -35,4 +35,22 @@ canvas {
 
 .canvas-container {
 	margin-top: 4rem;
+}
+
+.map-container {
+	position: relative;
+	display: inline-block;
+	border: 1px solid gray;
+}
+
+.map-canvas {
+}
+
+.fg {
+	z-index: 2;
+}
+
+.bg {
+	position: absolute;
+	z-index: : 1;
 }
