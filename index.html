@@ -6,11 +6,39 @@
 	
 	<script type = "text/javascript" src = "js/lib/es6-promise.auto.min.js"></script>
 	<script type = "text/javascript" src = "js/lib/tinycolor2.js"></script>
+	<script type = "text/javascript" src = "js/lib/pixi.min.js"></script>
 	<script type = "text/javascript" src = "js/rays.js"></script>
 	<script type = "text/javascript" src = "js/load.js"></script>
 	
 	<link rel = "stylesheet" type = "text/css" href = "css/normalize.css">
 	<link rel = "stylesheet" type = "text/css" href = "css/rays.css">
+	
+	<script id = "shader" type = "shader">
+		varying vec2 vTextureCoord;
+		uniform sampler2D uSampler;
+		uniform vec4 filterArea;
+		uniform vec2 dimensions;
+		
+		vec2 mapCoord(vec2 coord) {
+			coord *= filterArea.xy;
+			coord += filterArea.zw;
+			return coord;
+		}
+		
+		void main(void){
+			float sq_size = 0.008;
+			vec2 raw = vec2((vTextureCoord.x / sq_size), (vTextureCoord.y / sq_size));
+			vec2 fr = fract(raw);
+			vec2 sq_coord = vec2(floor(vTextureCoord.x / sq_size) * sq_size, floor(vTextureCoord.y / sq_size) * sq_size);
+			vec4 temp = texture2D(uSampler, sq_coord);
+			
+			float multx = step(abs(fr[0]), 0.8);
+			float multy = step(abs(fr[1]), 0.8);
+			
+			
+			gl_FragColor = vec4(temp.r * multx * multy, temp.g * multx * multy, temp.b * multx * multy, 1.0);
+		}
+	</script>
 	
 </head>
 

@@ -7,8 +7,9 @@ window.addEventListener("load", function() {
 	rays_app = new Rays.app({	canvas: canvas
 								, map_canvas: map_canvas
 								, map_bg_canvas: map_bg_canvas
-								, use_minimap: true
+								, use_minimap: false
 								, map_file_name: "map.png"
+								, renderer: "pixi" 
 								, fps_field: fps_field});
 	
 	

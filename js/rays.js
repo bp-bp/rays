@@ -252,10 +252,13 @@ var Rays = (function() {
 		main.map_bg_canvas = init.map_bg_canvas || null;
 		main.fps_field = init.fps_field || null;
 		main.map_file_name = init.map_file_name || null;
+		
+		// check that we got a file name for the map
 		if (! main.map_file_name) {
 			throw new Error("you must provide a map file");
 		}
 		
+		// handle whether we are going to draw the minimap
 		if (! init.use_minimap) {
 			main.use_minimap = false;
 		}
@@ -267,6 +270,64 @@ var Rays = (function() {
 				throw new Error("use_minimap set to true but map_canvas and/or map_bg_canvas not provided");
 			}
 			main.use_minimap = true;
+		}
+		// draw minimap only once, check this flag
+		main.minimap_bg_drawn = false;
+		
+		// renderer
+		main.renderer = init.renderer || "vanilla"; // options are "vanilla" or "pixi"
+		main.pixi_renderer = null;
+		main.pixi_stage = null;
+		// if using pixijs
+		if (main.renderer === "pixi") {
+			// first test
+			var type = "WebGL";
+			if (! PIXI.utils.isWebGLSupported()) {
+				type = "canvas";
+			}
+			PIXI.utils.sayHello(type);
+			
+			// now set up
+			main.pixi_renderer = PIXI.autoDetectRenderer({	width: main.canvas.width
+															, height: main.canvas.height
+															, antialias: false
+															, transparent: true
+															, resolution: 1
+															, backgroundColor: 0x000000
+															, view: main.canvas});
+			main.pixi_stage = new PIXI.Container();
+			main.pixi_renderer.render(main.pixi_stage);
+			
+			// test renderer is working
+			/*
+			PIXI.loader.add(main.map_file_name).load(setup);
+			function setup() {
+				var sprite = new PIXI.Sprite(PIXI.loader.resources[main.map_file_name].texture);
+				main.pixi_stage.addChild(sprite);
+				main.pixi_renderer.render(main.pixi_stage);
+			}
+			*/
+			
+			// test primitives
+			/*
+			var g = new PIXI.Graphics();
+			g.beginFill("0x4286f4");
+			g.lineStyle(5, "0x4286f4");
+			g.drawRect(10, 10, 100, 100);
+			g.drawRect(200, 300, 5, 5);
+			//main.pixi_stage.addChild(g);
+			main.pixi_renderer.render(main.pixi_stage);
+			*/
+			main.pixi_graphics = new PIXI.Graphics();
+			
+			// shader
+			var shader_code = document.getElementById("shader").innerHTML;
+			console.log(shader_code);
+			var shader = new PIXI.Filter("", shader_code, "");
+			main.pixi_graphics.filters = [shader];
+			
+			main.pixi_stage.addChild(main.pixi_graphics);
+			
 		}
 		
 		// for drawing
@@ -323,7 +384,7 @@ var Rays = (function() {
 		main.paused = false;
 		main.blur_paused = false;
 		main.player = new main.Player({loc: new main.Pt({x: 1.0, y: 1.0}), dir: Math.PI * 0.25});
-		main.draw_mode = "edges"; // options are "solid" and "edges"
+		main.draw_mode = "solid"; // options are "solid" and "edges"
 	};
 
 	Main.prototype.dt = function() {
@@ -400,7 +461,7 @@ var Rays = (function() {
 
 	Main.prototype.draw_batched_view_rects = function() {
 		var main = this;
-
+		
 		Object.keys(main.view_batched_rects).forEach(function(col) {
 			main.view_ctx.fillStyle = col;
 			main.view_ctx.beginPath();
@@ -410,6 +471,36 @@ var Rays = (function() {
 			main.view_ctx.fill();
 			main.view_ctx.closePath();
 		});
+		main.view_batched_rects = {};
+	};
+	
+	// put this guy somewhere else or stick him onto Main
+	function cnvt_hex_color(str) {
+		return "0x" + str.slice(1);
+	}
+	
+	// pixi draw batched
+	Main.prototype.draw_batched_view_rects_pixi = function() {
+		var main = this;
+		
+		Object.keys(main.view_batched_rects).forEach(function(_col) {
+			var col = cnvt_hex_color(_col);
+			main.pixi_graphics.beginFill(col);
+			main.view_batched_rects[_col].forEach(function(rc) {
+				main.pixi_graphics.drawRect(rc.x, rc.y, rc.width, rc.height);
+			});
+			
+			/*
+			main.view_ctx.fillStyle = col;
+			main.view_ctx.beginPath();
+			main.view_batched_rects[col].forEach(function(rc) {
+				main.view_ctx.rect(rc.x, rc.y, rc.width, rc.height);
+			});
+			main.view_ctx.fill();
+			main.view_ctx.closePath();
+			*/
+		});
+		
 		main.view_batched_rects = {};
 	};
 	
@@ -472,7 +563,13 @@ var Rays = (function() {
 
 	Main.prototype.draw_minimap = function() {
 		var main = this; 
-
+		
+		if (! main.minimap_bg_drawn) {
+			main.map_bg_ctx.clearRect(0, 0, main.map_bg_canvas.width, main.map_bg_canvas.height);
+			main.map_bg_ctx.drawImage(main.map_img, 0, 0, main.map_bg_canvas.width, main.map_bg_canvas.height);
+			main.minimap_bg_drawn = true;
+		}
+		
 		// draw the map image scaled-up on the map background canvas
 		//main.map_bg_ctx.clearRect(0, 0, main.map_bg_canvas.width, main.map_bg_canvas.height);
 		//main.map_bg_ctx.drawImage(main.map_img, 0, 0, main.map_bg_canvas.width, main.map_bg_canvas.height);
@@ -801,23 +898,51 @@ var Rays = (function() {
 		main.player.move();
 		
 		// handle drawing
-		if (main.needs_draw) {
-			// clear view screen
-			main.view_ctx.clearRect(0, 0, main.canvas.width, main.canvas.height);
-			main.view_ctx.fillStyle = "#000000";
-			main.view_ctx.rect(0, 0, main.canvas.width, main.canvas.height);
-			main.view_ctx.fill();
+		if (main.renderer === "vanilla") {
+			if (main.needs_draw) {
+				// clear view screen
+				main.view_ctx.clearRect(0, 0, main.canvas.width, main.canvas.height);
+				main.view_ctx.fillStyle = "#000000";
+				main.view_ctx.rect(0, 0, main.canvas.width, main.canvas.height);
+				main.view_ctx.fill();
 
-			// clear mini map
-			main.map_ctx.clearRect(-1, -1, main.map_canvas.width + 1, main.map_canvas.height + 1);
+				// clear mini map
+				main.map_ctx.clearRect(-1, -1, main.map_canvas.width + 1, main.map_canvas.height + 1);
 
-			// draw the minimap with the player's new position
-			if (main.use_minimap) {
-				main.draw_minimap();
+				// draw the minimap with the player's new position
+				if (main.use_minimap) {
+					main.draw_minimap();
+				}
+
+				// draw our columns in the view screen
+				var columns = main.get_columns();
+				columns.forEach(function(col) {
+					main.draw_column(col);
+					// batch up minimap draw calls
+					if (main.use_minimap) {
+						col.grid_points.forEach(function(g) {
+							main.batch_minimap_point(g, "#76ff00");
+						});
+					}
+				});
+				// draw minimap points
+				if (main.use_minimap) {
+					main.draw_batched_minimap_rects();
+				}
+
+				if (main.draw_mode === "solid") {
+					main.draw_batched_view_rects();
+				}
+				else if (main.draw_mode === "edges") {
+					main.draw_batched_view_edges();
+				}
+
+				main.needs_draw = false;
 			}
-
-			// draw our columns in the view screen
+		}
+		else if (main.renderer === "pixi") {
 			var columns = main.get_columns();
+			// batch up our column draws
 			columns.forEach(function(col) {
 				main.draw_column(col);
 				// batch up minimap draw calls
@@ -832,14 +957,14 @@ var Rays = (function() {
 				main.draw_batched_minimap_rects();
 			}
 			
-			if (main.draw_mode === "solid") {
-				main.draw_batched_view_rects();
-			}
-			else if (main.draw_mode === "edges") {
-				main.draw_batched_view_edges();
-			}
-			
-			main.needs_draw = false;
+			// now draw
+			main.pixi_graphics.clear();
+			main.pixi_graphics.beginFill(0x000000);
+			main.pixi_graphics.drawRect(0, 0, main.canvas.width, main.canvas.height);
+			//main.pixi_stage.removeChild(main.pixi_graphics);
+			main.draw_batched_view_rects_pixi();
+			//main.pixi_stage.addChild(main.pixi_graphics);
+			main.pixi_renderer.render(main.pixi_stage);
 		}
 		
 		// fps stuff
@@ -856,7 +981,7 @@ var Rays = (function() {
 			main.fps_samples = [];
 		}
 		
-		// proceed to next tick
+		// proceed to next tick unless paused
 		if (! main.paused) {
 			main.anim = window.requestAnimationFrame(main.tick.bind(main));
 		}
@@ -934,8 +1059,10 @@ var Rays = (function() {
 		main.load_map(main.map_file_name).then(
 			// start stuff running
 			function() {
-				main.map_bg_ctx.clearRect(0, 0, main.map_bg_canvas.width, main.map_bg_canvas.height);
-				main.map_bg_ctx.drawImage(main.map_img, 0, 0, main.map_bg_canvas.width, main.map_bg_canvas.height);
+				if (main.renderer === "vanilla" && main.use_minimap) {
+					//main.map_bg_ctx.clearRect(0, 0, main.map_bg_canvas.width, main.map_bg_canvas.height);
+					//main.map_bg_ctx.drawImage(main.map_img, 0, 0, main.map_bg_canvas.width, main.map_bg_canvas.height);
+				}
 				main.resume();
 			}
 		);
