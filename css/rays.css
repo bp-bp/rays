@@ -46,11 +46,17 @@ canvas {
 .map-canvas {
 }
 
+.bg {
+	/*position: absolute;
+	left: 0;
+	top: 0;*/
+	/*z-index: 1;*/
+}
+
 .fg {
+	position: absolute;
+	left: 0;
+	top: 0;
 	z-index: 2;
 }
 
-.bg {
-	position: absolute;
-	z-index: : 1;
-}

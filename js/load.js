@@ -4,7 +4,11 @@ window.addEventListener("load", function() {
 	var map_canvas = document.getElementById("map_canvas");
 	var map_bg_canvas = document.getElementById("map_bg_canvas");
 	var fps_field = document.getElementById("fps_field");
-	rays_app = new Rays.app({canvas: canvas, map_canvas: map_canvas, map_bg_canvas: map_bg_canvas, fps_field: fps_field});
+	rays_app = new Rays.app({	canvas: canvas
+								, map_canvas: map_canvas
+								, map_bg_canvas: map_bg_canvas
+								, use_minimap: true
+								, fps_field: fps_field});
 	
 	
 	var solid_button = document.getElementById("solid_mode_button");

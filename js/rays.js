@@ -91,7 +91,6 @@ var Rays = (function() {
 				rect.y = init.y;
 			}
 			else {
-				console.log(init);
 				throw new Error("problem in Rect init: x, y, or pt are not present or invalid.");
 			}
 			// now width,height
@@ -100,7 +99,6 @@ var Rays = (function() {
 				rect.height = init.height;
 			}
 			else {
-				console.log(init);
 				throw new Error("problem in Rect init: width or height are not present or not numbers.");
 			}
 		};
@@ -248,10 +246,26 @@ var Rays = (function() {
 	Main.prototype.init = function(init) {
 		var main = this;
 		
-		// drawing
+		// handle init options
 		main.canvas = init.canvas || null;
 		main.map_canvas = init.map_canvas || null;
 		main.map_bg_canvas = init.map_bg_canvas || null;
+		main.fps_field = init.fps_field || null;
+		
+		if (! init.use_minimap) {
+			main.use_minimap = false;
+		}
+		else {
+			// if we were told to use a minimap, check that we got both minimap canvases passed in
+			if ((! main.map_canvas || ! main.map_bg_canvas)
+				|| (main.map_canvas && main.map_canvas.nodeName != "CANVAS")
+				|| (main.map_bg_canvas && main.map_bg_canvas.nodeName != "CANVAS")) {
+				throw new Error("use_minimap set to true but map_canvas and/or map_bg_canvas not provided");
+			}
+			main.use_minimap = true;
+		}
+		
+		// for drawing
 		main.view_ctx = main.canvas.getContext("2d");
 		main.view_batched_rects = {}; // for solid draw mode -- keys are colors, values are Rects
 		main.view_batched_edges = {}; // for edge draw mode -- keys are squares...
@@ -272,7 +286,7 @@ var Rays = (function() {
 		main.map_img = null; // loaded in Main.load_map()
 		main.last_tick = Date.now();
 		main.current_tick = Date.now();
-		main.fps_field = init.fps_field || null;
+		
 		main.fps_samples = [];
 		main.needs_draw = true; 
 		main.anim = null; // return value from requestAnimationFrame
@@ -456,7 +470,7 @@ var Rays = (function() {
 		var main = this; 
 
 		// draw the map image scaled-up on the map background canvas
-		main.map_bg_ctx.clearRect(0, 0, main.map_bg_canvas.width, main.map_bg_canvas.height);
+		//main.map_bg_ctx.clearRect(0, 0, main.map_bg_canvas.width, main.map_bg_canvas.height);
 		//main.map_bg_ctx.drawImage(main.map_img, 0, 0, main.map_bg_canvas.width, main.map_bg_canvas.height);
 
 		// draw the grid -- skippiing the grid for now
@@ -594,7 +608,9 @@ var Rays = (function() {
 			main.batch_view_edge(draw_rect, col, "white");
 		}
 	};
-
+	
+	// given an x/y position and the cos and sin of the view angle, 
+	// get the corresponding map square
 	Main.prototype.get_square = function(x, y, cos, sin) {
 		var main = this;
 
@@ -629,7 +645,8 @@ var Rays = (function() {
 		
 		return ret;
 	};
-
+	
+	// distance between two points
 	Main.prototype.get_dist = function(pt1, pt2) {
 		var x_diff = Math.abs(pt1.x - pt2.x);
 		var y_diff = Math.abs(pt1.y - pt2.y);
@@ -637,7 +654,8 @@ var Rays = (function() {
 
 		return dist;
 	};
-
+	
+	// casts rays and gets the contents of our view columns
 	Main.prototype.get_columns = function() {
 		var main = this;
 
@@ -657,102 +675,13 @@ var Rays = (function() {
 		}
 
 		return columns;
-		
-		/*
-		function outside_map(pt) {
-			return (pt.x < 0 || pt.y < 0) || (pt.x > main.map_img.width || pt.y > main.map_img.height);
-		}
-
-		function cast_ray(ang) {
-			var cur = {ang: ang, is_wall: false};
-			var temp_pt = new main.Pt({x: main.player.loc.x, y: main.player.loc.y});;
-			var dist, stop = false, cnt = 0;
-			
-			var cos, sin;
-			if (main.cos_calls[ang] != undefined) {
-				cos = main.cos_calls[ang];
-			}
-			else {
-				cos = Math.cos(ang);
-				main.cos_calls[ang] = cos;
-			}
-			if (main.sin_calls[ang] != undefined) {
-				sin = main.sin_calls[ang];
-			}
-			else {
-				sin = Math.sin(ang);
-				main.sin_calls[ang] = sin;
-			}
-
-			while (! cur.is_wall && ! stop && ! outside_map(cur)) {
-				temp_pt = next_grid(cos, sin, temp_pt.x, temp_pt.y);
-				cur = main.get_square(temp_pt.x, temp_pt.y, cos, sin);
-				dist = dist = main.get_dist(main.player.loc, temp_pt);
-				cur.dist = dist;
-				if (dist > main.max_view_dist) {
-					stop = true;
-				}
-			}
-
-			cur.x = temp_pt.x;
-			cur.y = temp_pt.y;
-
-			// illuminate ray endpoint
-			main.batch_minimap_point(new main.Pt({x: cur.x, y: cur.y}), "#76ff00");
-			main.draw_batched_minimap_rects();
-
-			return cur;
-		}
-
-		function next_whole(num) {
-			if (num % 1.0 === 0) {
-				return num + 1.0;
-			}
-			return Math.ceil(num);
-		}
-
-		function next_whole_down(num) {
-			if (num % 1.0 === 0) {
-				return num - 1.0;
-			}
-			return Math.floor(num);
-		}
-
-		function next_grid(run, rise, x, y) {
-			var temp_x, temp_y, whole_x, whole_x_y, whole_y, whole_y_x;
-
-			temp_x = run >= 0 ? next_whole(x) - x : next_whole_down(x) - x;
-			temp_y = temp_x * (rise/run);
-			whole_x = temp_x + x;
-			whole_x_y = temp_y + y;
-
-			temp_y = rise >= 0 ? next_whole(y) - y : next_whole_down(y) - y;
-			temp_x = temp_y * (run/rise);
-			whole_y = temp_y + y;
-			whole_y_x = temp_x + x;
-
-			var whole_x_pt = new main.Pt({x: whole_x, y: whole_x_y});
-			var whole_y_pt = new main.Pt({x: whole_y_x, y: whole_y});
-
-			var init_pt = new main.Pt({x: x, y: y});
-			var whole_x_dist = main.get_dist(init_pt, whole_x_pt);
-			var whole_y_dist = main.get_dist(init_pt, whole_y_pt);
-
-			var ret = whole_x_dist <= whole_y_dist ? new main.Pt({x: whole_x, y: whole_x_y}) : new main.Pt({x: whole_y_x, y: whole_y});
-
-			// illuminate ray
-			main.batch_minimap_point(new main.Pt({x: ret.x, y: ret.y}), "#76ff00");
-
-			return ret;
-		}
-		*/
 	};
 
 	Main.prototype.cast_ray = function(ang) {
 		var main = this;
 		
+		// ang and is_wall are set here only for first loop of while down below
 		var cur = {ang: ang, is_wall: false}, grid_points = [];
-		//console.log(cur.grid_points);
 		var temp_pt = new main.Pt({x: main.player.loc.x, y: main.player.loc.y});;
 		var dist, stop = false, cnt = 0;
 
@@ -839,9 +768,6 @@ var Rays = (function() {
 
 		var ret = whole_x_dist <= whole_y_dist ? new main.Pt({x: whole_x, y: whole_x_y}) : new main.Pt({x: whole_y_x, y: whole_y});
 
-		// illuminate ray
-		//main.batch_minimap_point(new main.Pt({x: ret.x, y: ret.y}), "#76ff00");
-
 		return ret;
 	};
 
@@ -853,7 +779,8 @@ var Rays = (function() {
 		var total = arr.reduce(sum_up);
 		return total / arr.length;
 	};
-
+	
+	// not really using this but I like having it for testing because I cannot into math
 	Main.prototype.to_deg = function(rad) {
 		return (180.0/Math.PI) * rad;
 	};
@@ -878,22 +805,28 @@ var Rays = (function() {
 			main.view_ctx.fill();
 
 			// clear mini map
-			main.map_ctx.clearRect(0, 0, main.map_canvas.width, main.map_canvas.height);
+			main.map_ctx.clearRect(-1, -1, main.map_canvas.width + 1, main.map_canvas.height + 1);
 
 			// draw the minimap with the player's new position
-			main.draw_minimap();
+			if (main.use_minimap) {
+				main.draw_minimap();
+			}
 
 			// draw our columns in the view screen
 			var columns = main.get_columns();
 			columns.forEach(function(col) {
 				main.draw_column(col);
 				// batch up minimap draw calls
-				col.grid_points.forEach(function(g) {
-					main.batch_minimap_point(g, "#76ff00");
-				});
+				if (main.use_minimap) {
+					col.grid_points.forEach(function(g) {
+						main.batch_minimap_point(g, "#76ff00");
+					});
+				}
 			});
 			// draw minimap points
-			main.draw_batched_minimap_rects();
+			if (main.use_minimap) {
+				main.draw_batched_minimap_rects();
+			}
 			
 			if (main.draw_mode === "solid") {
 				main.draw_batched_view_rects();
@@ -942,7 +875,6 @@ var Rays = (function() {
 		main.paused = false;
 		main.fps_field.innerHTML = "";
 		
-		console.log("anim: ", main.anim);
 		main.anim = window.requestAnimationFrame(main.tick.bind(main));
 	};
 
@@ -959,6 +891,8 @@ var Rays = (function() {
 		var img_data_prom = new Promise(function (resolve, reject) {
 			main.map_img.onload = function() {
 				// grab data from image
+				temp.height = this.height;
+				temp.width = this.width;
 				temp_ctx.drawImage(this, 0, 0);
 				img_data = temp_ctx.getImageData(0, 0, main.map_img.width, main.map_img.height);
 
@@ -996,6 +930,8 @@ var Rays = (function() {
 		main.load_map("big_map.png").then(
 			// start stuff running
 			function() {
+				main.map_bg_ctx.clearRect(0, 0, main.map_bg_canvas.width, main.map_bg_canvas.height);
+				main.map_bg_ctx.drawImage(main.map_img, 0, 0, main.map_bg_canvas.width, main.map_bg_canvas.height);
 				main.resume();
 			}
 		);
