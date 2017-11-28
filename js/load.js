@@ -8,6 +8,7 @@ window.addEventListener("load", function() {
 								, map_canvas: map_canvas
 								, map_bg_canvas: map_bg_canvas
 								, use_minimap: true
+								, map_file_name: "map.png"
 								, fps_field: fps_field});
 	
 	

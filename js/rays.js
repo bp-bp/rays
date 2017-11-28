@@ -251,6 +251,10 @@ var Rays = (function() {
 		main.map_canvas = init.map_canvas || null;
 		main.map_bg_canvas = init.map_bg_canvas || null;
 		main.fps_field = init.fps_field || null;
+		main.map_file_name = init.map_file_name || null;
+		if (! main.map_file_name) {
+			throw new Error("you must provide a map file");
+		}
 		
 		if (! init.use_minimap) {
 			main.use_minimap = false;
@@ -927,7 +931,7 @@ var Rays = (function() {
 	Main.prototype.run = function() {
 		var main = this;
 
-		main.load_map("big_map.png").then(
+		main.load_map(main.map_file_name).then(
 			// start stuff running
 			function() {
 				main.map_bg_ctx.clearRect(0, 0, main.map_bg_canvas.width, main.map_bg_canvas.height);
