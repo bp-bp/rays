@@ -251,7 +251,14 @@ var Rays = (function() {
 		main.map_canvas = init.map_canvas || null;
 		main.map_bg_canvas = init.map_bg_canvas || null;
 		main.fps_field = init.fps_field || null;
+		main.controls_container = init.controls_container || null;
 		main.map_file_name = init.map_file_name || null;
+		main.wall_tex_file_name = init.wall_tex_file_name || null;
+		main.wall_tex = null; // will be loaded
+		main.column_width = parseFloat(init.column_width) || 6.0; // I guess 6 is a reasonable default
+		main.wall_tex_slice_width = null; // equal to wall_tex.width / column_width after wall_tex is loaded
+		main.max_view_dist = parseFloat(init.max_view_dist) || 20.0;
+		main.move_speed = parseFloat(init.move_speed) || 10.0; // in map units per second
 		
 		// check that we got a file name for the map
 		if (! main.map_file_name) {
@@ -280,6 +287,7 @@ var Rays = (function() {
 		main.pixi_stage = null;
 		// if using pixijs
 		if (main.renderer === "pixi") {
+			
 			// first test
 			var type = "WebGL";
 			if (! PIXI.utils.isWebGLSupported()) {
@@ -294,44 +302,99 @@ var Rays = (function() {
 															, transparent: true
 															, resolution: 1
 															, backgroundColor: 0x000000
+															, roundPixels: true
 															, view: main.canvas});
 			main.pixi_stage = new PIXI.Container();
 			main.pixi_renderer.render(main.pixi_stage);
-			
-			// test renderer is working
-			/*
-			PIXI.loader.add(main.map_file_name).load(setup);
-			function setup() {
-				var sprite = new PIXI.Sprite(PIXI.loader.resources[main.map_file_name].texture);
-				main.pixi_stage.addChild(sprite);
-				main.pixi_renderer.render(main.pixi_stage);
-			}
-			*/
-			
-			// test primitives
-			/*
-			var g = new PIXI.Graphics();
-			g.beginFill("0x4286f4");
-			g.lineStyle(5, "0x4286f4");
-			g.drawRect(10, 10, 100, 100);
-			g.drawRect(200, 300, 5, 5);
-			//main.pixi_stage.addChild(g);
-			main.pixi_renderer.render(main.pixi_stage);
-			*/
 			main.pixi_graphics = new PIXI.Graphics();
 			
+			PIXI.settings.SCALE_MODE = 1;//PIXI.SCALE_MODES.NEAREST;
+			
+			//var wood_tex = PIXI.Texture.fromImage("bad_wood.jpg");
+			//console.log(wood_tex.width);
+			
+			/*
+			var loader = new PIXI.loaders.Loader();
+			loader.add("wood_tex", "bad_wood.jpg");
+			loader.once("complete", function() {
+				console.log("complete");
+				main.pixi_stage.filters[0].uniforms.wood_tex = loader.resources["wood_tex"].texture;
+			});
+			*/
 			// shader
 			var shader_code = document.getElementById("shader").innerHTML;
-			console.log(shader_code);
-			var shader = new PIXI.Filter("", shader_code, "");
-			main.pixi_graphics.filters = [shader];
+			var shader = new PIXI.Filter("", shader_code);
+			//shader.uniforms.wood_tex = wood_tex;//loader.resources["wood_tex"].texture;
+			//main.pixi_graphics.filters = [shader];
 			
+			var loader = new PIXI.loaders.Loader();
+			loader.add("wood_tex", "nother_wood.jpg");
+			loader.load(function(loader, resources) {
+				//console.log("resources: ", resources);
+				//console.log(resources["wood_tex"].texture);
+				var wood_tex = resources["wood_tex"].texture;
+				wood_tex.baseTexture.wrapMode = PIXI.WRAP_MODES.REPEAT;
+				shader.uniforms.wood_tex = wood_tex;//resources["wood_tex"].texture;
+				shader.uniforms.wood_ratio = 4.0;// main.canvas.width / wood_tex.width;
+				console.log(shader.uniforms.wood_ratio);
+			});
+
 			main.pixi_stage.addChild(main.pixi_graphics);
+
+			main.pixi_stage.filters = [shader];
+			
+			// testing sprites
+			var sprite = new PIXI.Sprite(main.wall_tex);
+			main.pixi_stage.addChild(sprite);
+			main.pixi_renderer.render(main.pixi_stage);
 			
 		}
 		
-		// for drawing
-		main.view_ctx = main.canvas.getContext("2d");
+		// TEST TEST TEST
+		/*
+		main.test_canvas = document.createElement("canvas");
+		main.test_canvas.width = 512;
+		main.test_canvas.height = 512;
+		document.body.appendChild(main.test_canvas);
+		main.test_canvas_ctx = main.test_canvas.getContext("2d");
+		main.test_canvas_ctx.imageSmoothingEnabled = false;
+		main.test_canvas_ctx.msImageSmoothingEnabled = false;
+		main.test_canvas_ctx.mozImageSmoothingEnabled = false;
+		main.test_canvas_ctx.webkitImageSmoothingEnabled = false;
+		main.test_canvas_ctx.translate(0.5, 0.5);
+		*/
+		
+		// handle controls
+		if (! main.controls_container) {
+			// maybe put something here
+		}
+		else {
+			var solid_button = document.createElement("button");
+			solid_button.innerHTML = "solid";
+			solid_button.addEventListener("click", main.solid_mode.bind(main));
+			var edges_button = document.createElement("button");
+			edges_button.innerHTML = "edges";
+			edges_button.addEventListener("click", main.edges_mode.bind(main));
+			var texture_button = document.createElement("button");
+			texture_button.innerHTML = "texture";
+			texture_button.addEventListener("click", main.texture_mode.bind(main));
+			// disable texture button if no wall texture was provided
+			texture_button.disabled = main.wall_tex_file_name ? false : true;
+			
+			main.controls_container.appendChild(solid_button);
+			main.controls_container.appendChild(edges_button);
+			main.controls_container.appendChild(texture_button);
+		}
+		
+		// for drawing, vanilla
+		if (main.renderer === "vanilla") {
+			main.view_ctx = main.canvas.getContext("2d");
+			main.view_ctx.imageSmoothingEnabled = false;
+			main.view_ctx.msImageSmoothingEnabled = false;
+			main.view_ctx.mozImageSmoothingEnabled = false;
+			main.view_ctx.webkitImageSmoothingEnabled = false;
+			main.view_ctx.translate(0.5, 0.5);
+		}
 		main.view_batched_rects = {}; // for solid draw mode -- keys are colors, values are Rects
 		main.view_batched_edges = {}; // for edge draw mode -- keys are squares...
 		main.map_ctx = main.map_canvas.getContext("2d");
@@ -358,11 +421,11 @@ var Rays = (function() {
 
 		// constants etc
 		main.fov = Math.PI * 0.4;
-		main.max_view_dist = 100.0;//20.0;
-		main.num_columns = (main.canvas.width / 6);//100;
-		main.move_speed = 10.0; // in map units per second
+		//main.max_view_dist = 12.0;//20.0;
+		main.num_columns = (main.canvas.width / main.column_width);
+		//main.move_speed = 10.0; // in map units per second
 		main.turn_rate = Math.PI * 1.0; // in radians per second
-		main.wall_color = new Color("#828282");
+		main.wall_color = new Color("#828282"); // default if no wall texture
 		main.map_res_factor_x = null; // these will be filled in once the map is loaded and its dimensions are known
 		main.map_res_factor_y = null; // these will be filled in once the map is loaded and its dimensions are known
 		main.cos_calls = {}; // caches calls to Math.cos, keys are angles and values are Math.cos(angle)
@@ -384,7 +447,7 @@ var Rays = (function() {
 		main.paused = false;
 		main.blur_paused = false;
 		main.player = new main.Player({loc: new main.Pt({x: 1.0, y: 1.0}), dir: Math.PI * 0.25});
-		main.draw_mode = "solid"; // options are "solid" and "edges"
+		main.draw_mode = "solid"; // options are "solid", "edges", or "texture"
 	};
 
 	Main.prototype.dt = function() {
@@ -404,6 +467,12 @@ var Rays = (function() {
 		main.needs_draw = true;
 	};
 	
+	Main.prototype.texture_mode = function() {
+		var main = this;
+		main.draw_mode = "texture";
+		main.needs_draw = true;
+	};
+	
 	// for solid mode
 	Main.prototype.batch_view_rect = function(rc, color) {
 		var main = this;
@@ -412,6 +481,17 @@ var Rays = (function() {
 			main.view_batched_rects[color] = [];
 		}
 		main.view_batched_rects[color].push(rc);
+	};
+	
+	// for textured mode 
+	Main.prototype.batch_view_rect_tex = function(rc, dark_factor) {
+		var main = this;
+		
+		if (main.view_batched_rects["texture"] == undefined) {
+			main.view_batched_rects["texture"] = [];
+		}
+		rc.dark_factor = dark_factor; // just shove the darkness factor on there
+		main.view_batched_rects["texture"].push(rc);
 	};
 	
 	// for edge mode -- should I even specify color here?
@@ -462,16 +542,89 @@ var Rays = (function() {
 	Main.prototype.draw_batched_view_rects = function() {
 		var main = this;
 		
-		Object.keys(main.view_batched_rects).forEach(function(col) {
-			main.view_ctx.fillStyle = col;
+		Object.keys(main.view_batched_rects).forEach(function(color) {
+			main.view_ctx.fillStyle = color;
 			main.view_ctx.beginPath();
-			main.view_batched_rects[col].forEach(function(rc) {
+			main.view_batched_rects[color].forEach(function(rc) {
 				main.view_ctx.rect(rc.x, rc.y, rc.width, rc.height);
 			});
 			main.view_ctx.fill();
 			main.view_ctx.closePath();
 		});
 		main.view_batched_rects = {};
+	};
+	
+	Main.prototype.draw_batched_view_rects_tex = function() {
+		var main = this;
+		
+		// TEST TEST TEST
+		main.test_canvas_ctx.clearRect(0, 0, 512, 512);
+		
+		var offset_px, source_width;
+		if (main.view_batched_rects["texture"]) {
+			main.view_batched_rects["texture"].forEach(function(col, idx) {
+				offset_px = Math.floor(col.tex_offset * main.wall_tex.width);
+				if ((offset_px + 1) > main.wall_tex.width) {
+					//console.log("nasty");
+					offset_px = main.wall_tex.width - 1;
+				}
+				// this comes out ugly when close up, slices don't match up perfectly
+				main.view_ctx.drawImage(main.wall_tex					// image to draw
+										, offset_px						// source x
+										, 0								// source y
+										, 1.0							// source width -- always 1?
+										, main.wall_tex.height			// source height
+										, col.draw_rect.x				// destination x
+										, col.draw_rect.y				// destination y
+										, col.draw_rect.width			// destination width (scales)
+										, col.draw_rect.height);		// destination height (scales)
+			// TEST TEST TEST
+			if (idx === 1 || idx == 2 || idx == 3 || idx == 4) {
+				
+				main.test_canvas_ctx.drawImage(main.wall_tex					// image to draw
+										, offset_px						// source x
+										, 0								// source y
+										, 1.0//main.wall_tex_slice_width		// source width
+										, main.wall_tex.height			// source height
+										, col.draw_rect.x				// destination x
+										, col.draw_rect.y				// destination y
+										, col.draw_rect.width			// destination width (scales)
+										, col.draw_rect.height);		// destination height (scales)
+			}
+			
+			});
+		}
+		main.view_batched_rects = {};
+	};
+	
+	Main.prototype.draw_batched_view_rects_tex_pixi = function() {
+		var main = this;
+		
+		main.pixi_stage.removeChildren();
+		main.pixi_stage.addChild(main.pixi_graphics);
+		//console.log(main.pixi_stage.children);
+		
+		var offset_px, source_width, sprite; // source_width?
+		if (main.view_batched_rects["texture"]) {
+			main.view_batched_rects["texture"].forEach(function(col, idx) {
+				offset_px = Math.floor(col.tex_offset * main.base_wall_tex_pixi.width);
+				if ((offset_px + 1) > main.base_wall_tex_pixi.width) {
+					offset_px = main.base_wall_tex_pixi.width - 1; // or 1?
+				}
+				
+				//if (idx === 3) {
+					sprite = main.column_sprites[col.idx];
+					sprite.texture.frame = new PIXI.Rectangle(offset_px, 0, 1, main.base_wall_tex_pixi.height);
+					sprite.height = col.draw_rect.height;
+					sprite.width = main.column_width;
+					sprite.y = col.draw_rect.y;
+					main.pixi_stage.addChild(sprite);
+				//}
+			});
+		}
+		
+		main.view_batched_rects = {};
+		
 	};
 	
 	// put this guy somewhere else or stick him onto Main
@@ -489,16 +642,6 @@ var Rays = (function() {
 			main.view_batched_rects[_col].forEach(function(rc) {
 				main.pixi_graphics.drawRect(rc.x, rc.y, rc.width, rc.height);
 			});
-			
-			/*
-			main.view_ctx.fillStyle = col;
-			main.view_ctx.beginPath();
-			main.view_batched_rects[col].forEach(function(rc) {
-				main.view_ctx.rect(rc.x, rc.y, rc.width, rc.height);
-			});
-			main.view_ctx.fill();
-			main.view_ctx.closePath();
-			*/
 		});
 		
 		main.view_batched_rects = {};
@@ -695,15 +838,23 @@ var Rays = (function() {
 		var draw_rect = new main.Rect(init);
 		var center = new main.Pt({x: (draw_width * col.idx) - (draw_width / 2.0), y: main.canvas.height / 2.0});
 		draw_rect.center(center);
-
-		// set color darkness by distance
-		var this_color = main.wall_color.clone();//new Color(main.wall_color.toString());
-		var dark_factor = 100 * .9 * (col.dist / main.max_view_dist);
-		this_color = this_color.darken(dark_factor);
+		
+		// set draw darkness by distance
+		var dark_factor = 100.0 * 1.0 * ((col.dist) / (main.max_view_dist));
+		
+		// if we are drawing a solid wall without a texture
+		if (main.draw_mode === "solid") {
+			var this_color = main.wall_color.clone();//new Color(main.wall_color.toString());
+			this_color = this_color.darken(dark_factor);
+		}
 		
 		// done, add column to be drawn
 		if (main.draw_mode === "solid") {
 			main.batch_view_rect(draw_rect, this_color.toString());
+		}
+		else if (main.draw_mode === "texture") {
+			col.draw_rect = draw_rect;
+			main.batch_view_rect_tex(col, dark_factor); // am I going to use dark factor here?
 		}
 		else if (main.draw_mode === "edges") {
 			main.batch_view_edge(draw_rect, col, "white");
@@ -744,6 +895,16 @@ var Rays = (function() {
 		ret.square_y = lookup_y;
 		ret.square_pt = new main.Pt({x: lookup_x, y: lookup_y});
 		
+		// let's get our texture offset here too... a little wasteful
+		// also sometimes incorrect when looking in a negative direction...
+		var modx = x % 1.0, mody = y % 1.0;
+		if (modx === 0) {
+			ret.tex_offset = mody;
+		}
+		else {
+			ret.tex_offset = modx;
+		}
+		
 		return ret;
 	};
 	
@@ -773,6 +934,7 @@ var Rays = (function() {
 			col.ang = view_ang;
 			col.mod_ang = mod_ang;
 			columns.push(col);
+			//console.log(col);
 		}
 
 		return columns;
@@ -933,6 +1095,9 @@ var Rays = (function() {
 				if (main.draw_mode === "solid") {
 					main.draw_batched_view_rects();
 				}
+				else if (main.draw_mode === "texture") {
+					main.draw_batched_view_rects_tex();
+				}
 				else if (main.draw_mode === "edges") {
 					main.draw_batched_view_edges();
 				}
@@ -940,7 +1105,14 @@ var Rays = (function() {
 				main.needs_draw = false;
 			}
 		}
+		// minimap stuff still using vanilla renderer here
 		else if (main.renderer === "pixi") {
+			//return;
+			// clear mini map
+			if (main.use_minimap) {
+				main.map_ctx.clearRect(-1, -1, main.map_canvas.width + 1, main.map_canvas.height + 1);
+			}
+			
 			var columns = main.get_columns();
 			// batch up our column draws
 			columns.forEach(function(col) {
@@ -962,7 +1134,12 @@ var Rays = (function() {
 			main.pixi_graphics.beginFill(0x000000);
 			main.pixi_graphics.drawRect(0, 0, main.canvas.width, main.canvas.height);
 			//main.pixi_stage.removeChild(main.pixi_graphics);
-			main.draw_batched_view_rects_pixi();
+			if (main.draw_mode === "solid") {
+				main.draw_batched_view_rects_pixi();
+			}
+			else if (main.draw_mode === "texture") {
+				main.draw_batched_view_rects_tex_pixi();
+			}
 			//main.pixi_stage.addChild(main.pixi_graphics);
 			main.pixi_renderer.render(main.pixi_stage);
 		}
@@ -1052,11 +1229,68 @@ var Rays = (function() {
 
 		return img_data_prom;
 	};
+	
+	Main.prototype.load_wall_tex = function(url) {
+		var main = this;
+		
+		var wall_tex_prom;
+		
+		if (main.wall_tex_file_name) {
+			main.wall_tex = new Image();
+			main.wall_tex.src = url;
+			
+			wall_tex_prom = new Promise(function(resolve, reject) {
+				main.wall_tex.onload = function() {
+					main.wall_tex_slice_width = Math.round(main.wall_tex.width * (main.column_width / main.canvas.width)) || 1;
+					if (main.renderer === "pixi") {
+						main.base_wall_tex_pixi = new PIXI.BaseTexture(main.wall_tex);
+						main.base_wall_tex_pixi.scaleMode = PIXI.SCALE_MODES.NEAREST;
+						main.wall_tex_pixi = new PIXI.Texture(main.base_wall_tex_pixi);
+						
+						// keep this -- build a sprite and a texture for each vertical slice of the screen
+						main.column_sprites = [];
+						var c, col_sprite, slice_tex;
+						for (c = 0; c < main.num_columns; c++) {
+							slice_tex = new PIXI.Texture(main.base_wall_tex_pixi);
+							// set frame in draw_batched_view_rects_tex_pixi, not here
+							//slice_tex.frame = new PIXI.Rectangle(c * main.column_width, 0, main.column_width, main.wall_tex_pixi.height);
+							col_sprite = new PIXI.Sprite(slice_tex);
+							col_sprite.x = (c * main.column_width);
+							main.column_sprites.push(col_sprite);
+						}
+						
+						main.wall_tex_pixi.frame = new PIXI.Rectangle(0, 0, 25, main.wall_tex.height);
+						console.log(main.wall_tex_pixi.width);
+						//console.log(main.wall_tex.orig);
+						
+						var sprite = new PIXI.Sprite(main.wall_tex_pixi);
+						main.pixi_stage.addChild(sprite);
+						main.pixi_renderer.render(main.pixi_stage);
+					}
+					resolve(main.wall_tex); // maybe just "true", who cares
+				};
+				
+				main.wall_tex.onerror = function(err) {
+					reject(err);
+				}
+			}).catch(
+				function(err) {
+					throw new Error("problem loading wall texture image: ", err);
+				}
+
+			);
+		}
+		else {
+			wall_tex_prom = Promise.resolve();
+		}
+		
+		return wall_tex_prom;
+	};
 
 	Main.prototype.run = function() {
 		var main = this;
 
-		main.load_map(main.map_file_name).then(
+		main.load_map(main.map_file_name).then(main.load_wall_tex(main.wall_tex_file_name)).then(
 			// start stuff running
 			function() {
 				if (main.renderer === "vanilla" && main.use_minimap) {

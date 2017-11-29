@@ -16,27 +16,31 @@
 	<script id = "shader" type = "shader">
 		varying vec2 vTextureCoord;
 		uniform sampler2D uSampler;
-		uniform vec4 filterArea;
-		uniform vec2 dimensions;
-		
-		vec2 mapCoord(vec2 coord) {
-			coord *= filterArea.xy;
-			coord += filterArea.zw;
-			return coord;
-		}
+		uniform sampler2D wood_tex;
+		uniform float wood_ratio;
 		
 		void main(void){
-			float sq_size = 0.008;
+			// get square color
+			float sq_size = 0.00390625;
 			vec2 raw = vec2((vTextureCoord.x / sq_size), (vTextureCoord.y / sq_size));
 			vec2 fr = fract(raw);
 			vec2 sq_coord = vec2(floor(vTextureCoord.x / sq_size) * sq_size, floor(vTextureCoord.y / sq_size) * sq_size);
 			vec4 temp = texture2D(uSampler, sq_coord);
 			
+			// black borders
 			float multx = step(abs(fr[0]), 0.8);
 			float multy = step(abs(fr[1]), 0.8);
 			
+			// step colors
+			float num_colors = 6.0;
+			temp = floor(temp * num_colors) / num_colors;
 			
-			gl_FragColor = vec4(temp.r * multx * multy, temp.g * multx * multy, temp.b * multx * multy, 1.0);
+			vec4 wood_color = texture2D(wood_tex, vTextureCoord * wood_ratio);
+			wood_color = wood_color * temp;
+			
+			//gl_FragColor = texture2D(uSampler, vTextureCoord);
+			//gl_FragColor = vec4(temp.r * multx * multy, temp.g * multx * multy, temp.b * multx * multy, 1.0);
+			gl_FragColor = vec4(wood_color.r * multx * multy, wood_color.g * multx * multy, wood_color.b * multx * multy, 1.0);
 		}
 	</script>
 	
@@ -50,12 +54,16 @@
 	<div class = "wrapper">
 		<header>
 			<h3>FPS: <span id = "fps_field"></span></h3>
+			<div id = "rays_controls_container"></div>
+			<!--
 			<button id = "solid_mode_button">Solid</button>
+			<button id = "textured_mode_button">Textured</button>
 			<button id = "edge_mode_button">Edges</button>
+			-->
 		</header>
 		
 		<div class = "canvas-container">
-			<canvas id = "main_canvas" class = "" width = "600px" height = "600px"></canvas>
+			<canvas id = "main_canvas" class = "" width = "512px" height = "512px"></canvas>
 			<div class = "map-container">
 				<canvas id = "map_bg_canvas" class = "map-canvas bg" width = "600px" height = "600px"></canvas
 				><canvas id = "map_canvas" class = "map-canvas fg" width = "600px" height = "600px"></canvas>
