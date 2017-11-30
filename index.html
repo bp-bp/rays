@@ -17,30 +17,51 @@
 		varying vec2 vTextureCoord;
 		uniform sampler2D uSampler;
 		uniform sampler2D wood_tex;
+		uniform sampler2D dark_wood_tex;
 		uniform float wood_ratio;
+		uniform float tile_width;
+		uniform float time;
 		
 		void main(void){
 			// get square color
-			float sq_size = 0.00390625;
+			float sq_size = tile_width;
 			vec2 raw = vec2((vTextureCoord.x / sq_size), (vTextureCoord.y / sq_size));
 			vec2 fr = fract(raw);
 			vec2 sq_coord = vec2(floor(vTextureCoord.x / sq_size) * sq_size, floor(vTextureCoord.y / sq_size) * sq_size);
-			vec4 temp = texture2D(uSampler, sq_coord);
+			vec4 sq_color = texture2D(uSampler, sq_coord);
 			
 			// black borders
 			float multx = step(abs(fr[0]), 0.8);
 			float multy = step(abs(fr[1]), 0.8);
+			float border = multx * multy;
+			
+			// cut out corners -- not working right
+			//float corners = (abs(fr[0]) + abs(fr[1])) / 2.0;
+			//corners = step(corners, 0.6);
+			//border = border * corners;
 			
 			// step colors
 			float num_colors = 6.0;
-			temp = floor(temp * num_colors) / num_colors;
+			sq_color = floor(sq_color * num_colors) / num_colors;
 			
 			vec4 wood_color = texture2D(wood_tex, vTextureCoord * wood_ratio);
-			wood_color = wood_color * temp;
+			//wood_color = wood_color * sq_color;
+			wood_color = wood_color * step(0.1, sq_color.r);
+			
+			vec4 dark_wood_color = texture2D(dark_wood_tex, vTextureCoord * wood_ratio);
+			
+			
+			vec4 out_color;
+			if (wood_color.r < 0.1) {
+				out_color = dark_wood_color;
+			}
+			else {
+				out_color = wood_color;
+			}
 			
 			//gl_FragColor = texture2D(uSampler, vTextureCoord);
-			//gl_FragColor = vec4(temp.r * multx * multy, temp.g * multx * multy, temp.b * multx * multy, 1.0);
-			gl_FragColor = vec4(wood_color.r * multx * multy, wood_color.g * multx * multy, wood_color.b * multx * multy, 1.0);
+			//gl_FragColor = vec4(sq_color.r * multx * multy, sq_color.g * multx * multy, sq_color.b * multx * multy, 1.0);
+			gl_FragColor = vec4(out_color.r * border, out_color.g * border, out_color.b * border, 1.0);
 		}
 	</script>
 	

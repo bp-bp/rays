@@ -324,19 +324,28 @@ var Rays = (function() {
 			// shader
 			var shader_code = document.getElementById("shader").innerHTML;
 			var shader = new PIXI.Filter("", shader_code);
+			shader.uniforms.time = {type: "f", value: 0.0};
 			//shader.uniforms.wood_tex = wood_tex;//loader.resources["wood_tex"].texture;
 			//main.pixi_graphics.filters = [shader];
 			
 			var loader = new PIXI.loaders.Loader();
 			loader.add("wood_tex", "nother_wood.jpg");
+			loader.add("dark_wood_tex", "dark_wood.jpg");
 			loader.load(function(loader, resources) {
 				//console.log("resources: ", resources);
 				//console.log(resources["wood_tex"].texture);
 				var wood_tex = resources["wood_tex"].texture;
 				wood_tex.baseTexture.wrapMode = PIXI.WRAP_MODES.REPEAT;
 				shader.uniforms.wood_tex = wood_tex;//resources["wood_tex"].texture;
+				
+				var dark_wood_tex = resources["dark_wood_tex"].texture;
+				dark_wood_tex.baseTexture.wrapMode = PIXI.WRAP_MODES.REPEAT;
+				shader.uniforms.dark_wood_tex = dark_wood_tex;
+				
 				shader.uniforms.wood_ratio = 4.0;// main.canvas.width / wood_tex.width;
-				console.log(shader.uniforms.wood_ratio);
+				shader.uniforms.tile_width = (main.column_width / main.canvas.width) / 2.0;
+				
+				//shader.uniforms.time = 0.0;
 			});
 
 			main.pixi_stage.addChild(main.pixi_graphics);
@@ -1141,6 +1150,8 @@ var Rays = (function() {
 				main.draw_batched_view_rects_tex_pixi();
 			}
 			//main.pixi_stage.addChild(main.pixi_graphics);
+			console.log(main.pixi_stage.filters);
+			//main.pixi_stage.filters[0].uniforms.time.value += 0.1;
 			main.pixi_renderer.render(main.pixi_stage);
 		}
 		
