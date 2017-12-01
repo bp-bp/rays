@@ -12,9 +12,9 @@ window.addEventListener("load", function() {
 								, map_file_name: "map.png"
 								, wall_tex_file_name: "wall_tex.png"
 								, renderer: "pixi" 
-								, max_view_dist: 100.0
+								, max_view_dist: 20.0
 								, column_width: 6.0
-								, move_speed: 8.0
+								, move_speed: 10.0
 								, fps_field: fps_field
 								, controls_container: controls_container});
 	

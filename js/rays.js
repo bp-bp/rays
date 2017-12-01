@@ -308,49 +308,63 @@ var Rays = (function() {
 			main.pixi_renderer.render(main.pixi_stage);
 			main.pixi_graphics = new PIXI.Graphics();
 			
+			
 			PIXI.settings.SCALE_MODE = 1;//PIXI.SCALE_MODES.NEAREST;
-			
-			//var wood_tex = PIXI.Texture.fromImage("bad_wood.jpg");
-			//console.log(wood_tex.width);
-			
-			/*
-			var loader = new PIXI.loaders.Loader();
-			loader.add("wood_tex", "bad_wood.jpg");
-			loader.once("complete", function() {
-				console.log("complete");
-				main.pixi_stage.filters[0].uniforms.wood_tex = loader.resources["wood_tex"].texture;
-			});
-			*/
+			PIXI.SCALE_MODES.DEFAULT =1;// PIXI.SCALE_MODES.NEAREST;
+			console.log(PIXI.settings);
 			// shader
 			var shader_code = document.getElementById("shader").innerHTML;
-			var shader = new PIXI.Filter("", shader_code);
-			shader.uniforms.time = {type: "f", value: 0.0};
-			//shader.uniforms.wood_tex = wood_tex;//loader.resources["wood_tex"].texture;
-			//main.pixi_graphics.filters = [shader];
+			main.shader = new PIXI.Filter("", shader_code);
+			main.shader.uniforms.time = 0.0;
+			main.shader.uniforms.screen_width = main.canvas.width;
+			main.shader.blendMode = PIXI.BLEND_MODES.NORMAL;
+			main.shader.uniforms.dimensions = {type: "v2", value: [main.canvas.width, main.canvas.height]};
+			main.shader.dontFit = true;
 			
+			main.shader.apply = function(filterManager, input, output) {
+				this.uniforms.dimensions[0] = input.sourceFrame.width;
+				this.uniforms.dimensions[1] = input.sourceFrame.height;
+				
+				filterManager.applyFilter(this, input, output);
+			};
+			
+			// get our tile textures
 			var loader = new PIXI.loaders.Loader();
-			loader.add("wood_tex", "nother_wood.jpg");
-			loader.add("dark_wood_tex", "dark_wood.jpg");
+			loader.add("tile_tex0", "black_wood.jpg");
+			loader.add("tile_tex1", "dark_wood.jpg");
+			loader.add("tile_tex2", "medium_wood.jpg");
+			loader.add("tile_tex3", "light_wood.jpg");
+			
 			loader.load(function(loader, resources) {
-				//console.log("resources: ", resources);
-				//console.log(resources["wood_tex"].texture);
-				var wood_tex = resources["wood_tex"].texture;
-				wood_tex.baseTexture.wrapMode = PIXI.WRAP_MODES.REPEAT;
-				shader.uniforms.wood_tex = wood_tex;//resources["wood_tex"].texture;
+				// once loaded, give them to the tile shader
+				var tile_tex0 = resources["tile_tex0"].texture;
+				tile_tex0.baseTexture.wrapMode = PIXI.WRAP_MODES.REPEAT;
+				main.shader.uniforms.tile_tex0 = tile_tex0;
 				
-				var dark_wood_tex = resources["dark_wood_tex"].texture;
-				dark_wood_tex.baseTexture.wrapMode = PIXI.WRAP_MODES.REPEAT;
-				shader.uniforms.dark_wood_tex = dark_wood_tex;
+				var tile_tex1 = resources["tile_tex1"].texture;
+				tile_tex1.baseTexture.wrapMode = PIXI.WRAP_MODES.REPEAT;
+				main.shader.uniforms.tile_tex1 = tile_tex1;
 				
-				shader.uniforms.wood_ratio = 4.0;// main.canvas.width / wood_tex.width;
-				shader.uniforms.tile_width = (main.column_width / main.canvas.width) / 2.0;
+				var tile_tex2 = resources["tile_tex2"].texture;
+				tile_tex2.baseTexture.wrapMode = PIXI.WRAP_MODES.REPEAT;
+				main.shader.uniforms.tile_tex2 = tile_tex2;
 				
-				//shader.uniforms.time = 0.0;
+				var tile_tex3 = resources["tile_tex3"].texture;
+				tile_tex3.baseTexture.wrapMode = PIXI.WRAP_MODES.REPEAT;
+				main.shader.uniforms.tile_tex3 = tile_tex3;
+				
+				main.shader.uniforms.tile_tex_ratio_x = (main.canvas.width / 256.0) * 2.0;
+				main.shader.uniforms.tile_tex_ratio_y = (main.canvas.height / 256.0) * 2.0;
+				main.shader.uniforms.tile_width = (main.column_width / main.canvas.width) / 2.0;
+				main.shader.uniforms.px_tile_width = main.column_width;
+				main.shader.uniforms.tile_height = (main.column_width / main.canvas.height) / 2.0;
+				
+				main.use_shader = true;
 			});
 
 			main.pixi_stage.addChild(main.pixi_graphics);
 
-			main.pixi_stage.filters = [shader];
+			main.pixi_stage.filters = [main.shader];
 			
 			// testing sprites
 			var sprite = new PIXI.Sprite(main.wall_tex);
@@ -381,18 +395,26 @@ var Rays = (function() {
 			var solid_button = document.createElement("button");
 			solid_button.innerHTML = "solid";
 			solid_button.addEventListener("click", main.solid_mode.bind(main));
+			
 			var edges_button = document.createElement("button");
 			edges_button.innerHTML = "edges";
 			edges_button.addEventListener("click", main.edges_mode.bind(main));
+			
 			var texture_button = document.createElement("button");
 			texture_button.innerHTML = "texture";
 			texture_button.addEventListener("click", main.texture_mode.bind(main));
 			// disable texture button if no wall texture was provided
 			texture_button.disabled = main.wall_tex_file_name ? false : true;
 			
+			var shader_button = document.createElement("button");
+			shader_button.innerHTML = "use shader";
+			shader_button.addEventListener("click", main.toggle_shader.bind(main));
+			shader_button.style.display = (main.renderer === "pixi") ? true : false;
+			
 			main.controls_container.appendChild(solid_button);
 			main.controls_container.appendChild(edges_button);
 			main.controls_container.appendChild(texture_button);
+			main.controls_container.appendChild(shader_button);
 		}
 		
 		// for drawing, vanilla
@@ -464,6 +486,7 @@ var Rays = (function() {
 		return main.current_tick - main.last_tick;
 	};
 	
+	// callbacks for display mode buttons
 	Main.prototype.solid_mode = function() {
 		var main = this;
 		main.draw_mode = "solid";
@@ -480,6 +503,18 @@ var Rays = (function() {
 		var main = this;
 		main.draw_mode = "texture";
 		main.needs_draw = true;
+	};
+	
+	Main.prototype.toggle_shader = function() {
+		var main = this;
+		
+		main.use_shader = ! main.use_shader;
+		if (main.use_shader) {
+			main.pixi_stage.filters = [main.shader];
+		}
+		else {
+			main.pixi_stage.filters = [];
+		}
 	};
 	
 	// for solid mode
@@ -567,7 +602,7 @@ var Rays = (function() {
 		var main = this;
 		
 		// TEST TEST TEST
-		main.test_canvas_ctx.clearRect(0, 0, 512, 512);
+		//main.test_canvas_ctx.clearRect(0, 0, 512, 512);
 		
 		var offset_px, source_width;
 		if (main.view_batched_rects["texture"]) {
@@ -588,6 +623,7 @@ var Rays = (function() {
 										, col.draw_rect.width			// destination width (scales)
 										, col.draw_rect.height);		// destination height (scales)
 			// TEST TEST TEST
+			/*
 			if (idx === 1 || idx == 2 || idx == 3 || idx == 4) {
 				
 				main.test_canvas_ctx.drawImage(main.wall_tex					// image to draw
@@ -600,18 +636,17 @@ var Rays = (function() {
 										, col.draw_rect.width			// destination width (scales)
 										, col.draw_rect.height);		// destination height (scales)
 			}
-			
+			*/
 			});
 		}
 		main.view_batched_rects = {};
 	};
 	
-	Main.prototype.draw_batched_view_rects_tex_pixi = function() {
+	Main.prototype.draw_batched_view_rects_tex_pixi = function(stage) {
 		var main = this;
 		
-		main.pixi_stage.removeChildren();
-		main.pixi_stage.addChild(main.pixi_graphics);
-		//console.log(main.pixi_stage.children);
+		stage.removeChildren();
+		stage.addChild(main.pixi_graphics);
 		
 		var offset_px, source_width, sprite; // source_width?
 		if (main.view_batched_rects["texture"]) {
@@ -627,7 +662,7 @@ var Rays = (function() {
 					sprite.height = col.draw_rect.height;
 					sprite.width = main.column_width;
 					sprite.y = col.draw_rect.y;
-					main.pixi_stage.addChild(sprite);
+					stage.addChild(sprite);
 				//}
 			});
 		}
@@ -1147,11 +1182,12 @@ var Rays = (function() {
 				main.draw_batched_view_rects_pixi();
 			}
 			else if (main.draw_mode === "texture") {
-				main.draw_batched_view_rects_tex_pixi();
+				main.draw_batched_view_rects_tex_pixi(main.pixi_stage);
 			}
-			//main.pixi_stage.addChild(main.pixi_graphics);
-			console.log(main.pixi_stage.filters);
-			//main.pixi_stage.filters[0].uniforms.time.value += 0.1;
+			
+			if (main.pixi_stage.filters && main.pixi_stage.filters.length) {
+				main.pixi_stage.filters[0].uniforms.time += 0.05;
+			}
 			main.pixi_renderer.render(main.pixi_stage);
 		}
 		
@@ -1255,6 +1291,7 @@ var Rays = (function() {
 					main.wall_tex_slice_width = Math.round(main.wall_tex.width * (main.column_width / main.canvas.width)) || 1;
 					if (main.renderer === "pixi") {
 						main.base_wall_tex_pixi = new PIXI.BaseTexture(main.wall_tex);
+						main.base_wall_tex_pixi.mipmap = false;
 						main.base_wall_tex_pixi.scaleMode = PIXI.SCALE_MODES.NEAREST;
 						main.wall_tex_pixi = new PIXI.Texture(main.base_wall_tex_pixi);
 						
@@ -1263,20 +1300,22 @@ var Rays = (function() {
 						var c, col_sprite, slice_tex;
 						for (c = 0; c < main.num_columns; c++) {
 							slice_tex = new PIXI.Texture(main.base_wall_tex_pixi);
+							slice_tex.scaleMode = PIXI.SCALE_MODES.NEAREST;
 							// set frame in draw_batched_view_rects_tex_pixi, not here
 							//slice_tex.frame = new PIXI.Rectangle(c * main.column_width, 0, main.column_width, main.wall_tex_pixi.height);
 							col_sprite = new PIXI.Sprite(slice_tex);
+							col_sprite.scaleMode = PIXI.SCALE_MODES.NEAREST;
 							col_sprite.x = (c * main.column_width);
 							main.column_sprites.push(col_sprite);
 						}
 						
 						main.wall_tex_pixi.frame = new PIXI.Rectangle(0, 0, 25, main.wall_tex.height);
-						console.log(main.wall_tex_pixi.width);
+						//console.log(main.wall_tex_pixi.width);
 						//console.log(main.wall_tex.orig);
 						
-						var sprite = new PIXI.Sprite(main.wall_tex_pixi);
-						main.pixi_stage.addChild(sprite);
-						main.pixi_renderer.render(main.pixi_stage);
+						//var sprite = new PIXI.Sprite(main.wall_tex_pixi);
+						//main.pixi_stage.addChild(sprite);
+						//main.pixi_renderer.render(main.pixi_stage);
 					}
 					resolve(main.wall_tex); // maybe just "true", who cares
 				};
