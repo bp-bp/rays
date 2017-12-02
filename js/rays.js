@@ -1186,7 +1186,7 @@ var Rays = (function() {
 			}
 			
 			if (main.pixi_stage.filters && main.pixi_stage.filters.length) {
-				main.pixi_stage.filters[0].uniforms.time += 0.05;
+				main.pixi_stage.filters[0].uniforms.time = performance.now() / 2000.0;//+= 0.002;
 			}
 			main.pixi_renderer.render(main.pixi_stage);
 		}
