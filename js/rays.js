@@ -186,9 +186,28 @@ var Rays = (function() {
 			}
 			return false;
 		};
-
+		
+		main.Player.prototype.move_step = function(move) {
+			var play = this;
+			
+			if (move.move_type === "step") {
+				var move_vec = new main.Pt({x: Math.cos(play.dir), y: Math.sin(play.dir)});
+				move_vec.mul(move.quant);
+				play.loc.x += move_vec.x;
+				play.loc.y += move_vec.y;
+			}
+			else if (move.move_type = "turn") {
+				play.dir += (move.quant * Math.PI);
+			}
+		}
+		
+		// moves the player depending on state of keys pressed in "smooth" move_mode
 		main.Player.prototype.move = function() {
 			var play = this;
+			
+			if (main.move_mode != "smooth") {
+				return;
+			}
 
 			if (! play.is_moving()) {
 				return;
@@ -199,7 +218,6 @@ var Rays = (function() {
 				move_vec.mul(main.move_speed * (main.dt() / 1000.0));
 
 				if (main.move_state.forward) {
-
 					var x_move_square = main.get_square(play.loc.x + move_vec.x, play.loc.y, move_vec.x, 0);
 					var y_move_square = main.get_square(play.loc.x, play.loc.y + move_vec.y, 0, move_vec.y);
 					var x_outside = (play.loc.x + move_vec.x) > main.map_img.width || (play.loc.x + move_vec.x) < 0;
@@ -259,6 +277,7 @@ var Rays = (function() {
 		main.wall_tex_slice_width = null; // equal to wall_tex.width / column_width after wall_tex is loaded
 		main.max_view_dist = parseFloat(init.max_view_dist) || 20.0;
 		main.move_speed = parseFloat(init.move_speed) || 10.0; // in map units per second
+		main.move_mode = init.move_mode || null; // options are "smooth" and "step"
 		
 		// check that we got a file name for the map
 		if (! main.map_file_name) {
@@ -308,6 +327,8 @@ var Rays = (function() {
 			main.pixi_renderer.render(main.pixi_stage);
 			main.pixi_graphics = new PIXI.Graphics();
 			
+			main.pixi_tex_buff = PIXI.RenderTexture.create(main.canvas.width, main.canvas.height);
+			
 			
 			PIXI.settings.SCALE_MODE = 1;//PIXI.SCALE_MODES.NEAREST;
 			PIXI.SCALE_MODES.DEFAULT =1;// PIXI.SCALE_MODES.NEAREST;
@@ -329,11 +350,13 @@ var Rays = (function() {
 			};
 			
 			// get our tile textures
+			// these should go in an atlas
 			var loader = new PIXI.loaders.Loader();
-			loader.add("tile_tex0", "black_wood.jpg");
-			loader.add("tile_tex1", "dark_wood.jpg");
-			loader.add("tile_tex2", "medium_wood.jpg");
-			loader.add("tile_tex3", "light_wood.jpg");
+			loader.add("tile_tex0", "textures/wood_tiles/black_wood.jpg");
+			loader.add("tile_tex1", "textures/wood_tiles/dark_wood.jpg");
+			loader.add("tile_tex2", "textures/wood_tiles/medium_wood.jpg");
+			loader.add("tile_tex3", "textures/wood_tiles/light_wood.jpg");
+			//loader.add("tile_tex_atlas", "wood_atlas.png");
 			
 			loader.load(function(loader, resources) {
 				// once loaded, give them to the tile shader
@@ -353,8 +376,14 @@ var Rays = (function() {
 				tile_tex3.baseTexture.wrapMode = PIXI.WRAP_MODES.REPEAT;
 				main.shader.uniforms.tile_tex3 = tile_tex3;
 				
+				//var tile_tex_atlas = resources["tile_tex_atlas"].texture;
+				//tile_tex_atlas.baseTexture.wrapMode = PIXI.WRAP_MODES.REPEAT;
+				//main.shader.uniforms.tile_tex_atlas = tile_tex_atlas;
+				
 				main.shader.uniforms.tile_tex_ratio_x = (main.canvas.width / 256.0) * 2.0;
 				main.shader.uniforms.tile_tex_ratio_y = (main.canvas.height / 256.0) * 2.0;
+				main.shader.uniforms.atlas_tex_ratio_x = (main.canvas.width / 512.0) * 2.0;
+				main.shader.uniforms.atlas_tex_ratio_y = (main.canvas.height / 512.0) * 2.0;
 				main.shader.uniforms.tile_width = (main.column_width / main.canvas.width) / 2.0;
 				main.shader.uniforms.px_tile_width = main.column_width;
 				main.shader.uniforms.tile_height = (main.column_width / main.canvas.height) / 2.0;
@@ -477,7 +506,7 @@ var Rays = (function() {
 		main.map_data = null;
 		main.paused = false;
 		main.blur_paused = false;
-		main.player = new main.Player({loc: new main.Pt({x: 1.0, y: 1.0}), dir: Math.PI * 0.25});
+		main.player = new main.Player({loc: new main.Pt({x: 5.0, y: 1.0}), dir: Math.PI * 0.5});
 		main.draw_mode = "solid"; // options are "solid", "edges", or "texture"
 	};
 
@@ -622,21 +651,7 @@ var Rays = (function() {
 										, col.draw_rect.y				// destination y
 										, col.draw_rect.width			// destination width (scales)
 										, col.draw_rect.height);		// destination height (scales)
-			// TEST TEST TEST
-			/*
-			if (idx === 1 || idx == 2 || idx == 3 || idx == 4) {
-				
-				main.test_canvas_ctx.drawImage(main.wall_tex					// image to draw
-										, offset_px						// source x
-										, 0								// source y
-										, 1.0//main.wall_tex_slice_width		// source width
-										, main.wall_tex.height			// source height
-										, col.draw_rect.x				// destination x
-										, col.draw_rect.y				// destination y
-										, col.draw_rect.width			// destination width (scales)
-										, col.draw_rect.height);		// destination height (scales)
-			}
-			*/
+			
 			});
 		}
 		main.view_batched_rects = {};
@@ -827,16 +842,38 @@ var Rays = (function() {
 		var main = this;
 
 		if (e.code === "KeyW" || e.key === "w" || e.key === "W") {
-			main.move_state.forward = val;
+			if (main.move_mode === "smooth") {
+				main.move_state.forward = val;
+			}
+			// ! val to trigger on keyup
+			else if (main.move_mode === "step" && ! val) {
+				main.player.move_step({move_type: "step", quant: 1.0});
+			}
 		}
 		else if (e.code === "KeyS" || e.key === "s" || e.key === "S") {
-			main.move_state.backward = val;
+			if (main.move_mode === "smooth") {
+				main.move_state.backward = val;
+			}
+			// ! val to trigger on keyup
+			else if (main.move_mode === "step" && ! val) {
+				main.player.move_step({move_type: "step", quant: -1.0});
+			}
 		}
 		else if (e.code === "KeyA" || e.key === "a" || e.key === "A") {
-			main.move_state.turn_left = val;
+			if (main.move_mode === "smooth") {
+				main.move_state.turn_left = val;
+			}
+			else if (main.move_mode === "step" && ! val) {
+				main.player.move_step({move_type: "turn", quant: -0.5});
+			}
 		}
 		else if (e.code === "KeyD"|| e.key === "d" || e.key === "D") {
-			main.move_state.turn_right = val;
+			if (main.move_mode === "smooth") {
+				main.move_state.turn_right = val;
+			}
+			else if (main.move_mode === "step" && ! val) {
+				main.player.move_step({move_type: "turn", quant: 0.5});
+			}
 		}
 	};
 	
@@ -1186,7 +1223,7 @@ var Rays = (function() {
 			}
 			
 			if (main.pixi_stage.filters && main.pixi_stage.filters.length) {
-				main.pixi_stage.filters[0].uniforms.time = performance.now() / 2000.0;//+= 0.002;
+				main.pixi_stage.filters[0].uniforms.time = performance.now() / 3000.0;//+= 0.002;
 			}
 			main.pixi_renderer.render(main.pixi_stage);
 		}
