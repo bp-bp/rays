@@ -187,8 +187,26 @@ var Rays = (function() {
 			return false;
 		};
 		
+		// moves the player stepwise
 		main.Player.prototype.move_step = function(move) {
 			var play = this;
+			
+			// TEST TEST TEST doesn't belong here
+			// copy current frame without shader
+			
+			console.log("rendertexture: ", main.pixi_tex_buff);
+			console.log("stage: ", main.pixi_stage);
+			
+			main.pixi_stage.filters = [];
+			main.pixi_renderer.render(main.pixi_stage, main.pixi_tex_buff);
+			
+			
+			main.step_trans_shader.uniforms.last_frame = main.pixi_tex_buff;
+			main.pixi_stage.filters = [main.step_trans_shader];
+			//console.log("filterarea: ", main.step_trans_shader.uniforms.filterArea);
+			main.transition = true;
+			
+			//console.log(main.pixi_tex_buff);
 			
 			if (move.move_type === "step") {
 				var move_vec = new main.Pt({x: Math.cos(play.dir), y: Math.sin(play.dir)});
@@ -199,7 +217,7 @@ var Rays = (function() {
 			else if (move.move_type = "turn") {
 				play.dir += (move.quant * Math.PI);
 			}
-		}
+		};
 		
 		// moves the player depending on state of keys pressed in "smooth" move_mode
 		main.Player.prototype.move = function() {
@@ -327,8 +345,9 @@ var Rays = (function() {
 			main.pixi_renderer.render(main.pixi_stage);
 			main.pixi_graphics = new PIXI.Graphics();
 			
-			main.pixi_tex_buff = PIXI.RenderTexture.create(main.canvas.width, main.canvas.height);
-			
+			main.pixi_tex_buff = PIXI.RenderTexture.create(main.pixi_renderer.width, main.pixi_renderer.height);
+			//main.pixi_tex_buff.baseTexture.mipmap = false;
+			main.pixi_tex_buff.baseTexture.scaleMode = 1;
 			
 			PIXI.settings.SCALE_MODE = 1;//PIXI.SCALE_MODES.NEAREST;
 			PIXI.SCALE_MODES.DEFAULT =1;// PIXI.SCALE_MODES.NEAREST;
@@ -349,6 +368,22 @@ var Rays = (function() {
 				filterManager.applyFilter(this, input, output);
 			};
 			
+			// step transition shader
+			var trans_shader_code = document.getElementById("compare_test").innerHTML;
+			main.step_trans_shader = new PIXI.Filter("", trans_shader_code);
+			main.step_trans_shader.uniforms.time = 0.0;
+			main.step_trans_shader.uniforms.screen_width = main.canvas.width;
+			main.step_trans_shader.blendMode = PIXI.BLEND_MODES.NORMAL;
+			main.step_trans_shader.uniforms.dimensions = {type: "v2", value: [main.canvas.width, main.canvas.height]};
+			main.step_trans_shader.dontFit = true;
+			
+			main.step_trans_shader.apply = function(filterManager, input, output) {
+				this.uniforms.dimensions[0] = input.sourceFrame.width;
+				this.uniforms.dimensions[1] = input.sourceFrame.height;
+				
+				filterManager.applyFilter(this, input, output);
+			};
+			
 			// get our tile textures
 			// these should go in an atlas
 			var loader = new PIXI.loaders.Loader();
@@ -363,18 +398,22 @@ var Rays = (function() {
 				var tile_tex0 = resources["tile_tex0"].texture;
 				tile_tex0.baseTexture.wrapMode = PIXI.WRAP_MODES.REPEAT;
 				main.shader.uniforms.tile_tex0 = tile_tex0;
+				main.step_trans_shader.uniforms.tile_tex0 = tile_tex0;
 				
 				var tile_tex1 = resources["tile_tex1"].texture;
 				tile_tex1.baseTexture.wrapMode = PIXI.WRAP_MODES.REPEAT;
 				main.shader.uniforms.tile_tex1 = tile_tex1;
+				main.step_trans_shader.uniforms.tile_tex1 = tile_tex1;
 				
 				var tile_tex2 = resources["tile_tex2"].texture;
 				tile_tex2.baseTexture.wrapMode = PIXI.WRAP_MODES.REPEAT;
 				main.shader.uniforms.tile_tex2 = tile_tex2;
+				main.step_trans_shader.uniforms.tile_tex2 = tile_tex2;
 				
 				var tile_tex3 = resources["tile_tex3"].texture;
 				tile_tex3.baseTexture.wrapMode = PIXI.WRAP_MODES.REPEAT;
 				main.shader.uniforms.tile_tex3 = tile_tex3;
+				main.step_trans_shader.uniforms.tile_tex3 = tile_tex3;
 				
 				//var tile_tex_atlas = resources["tile_tex_atlas"].texture;
 				//tile_tex_atlas.baseTexture.wrapMode = PIXI.WRAP_MODES.REPEAT;
@@ -382,11 +421,17 @@ var Rays = (function() {
 				
 				main.shader.uniforms.tile_tex_ratio_x = (main.canvas.width / 256.0) * 2.0;
 				main.shader.uniforms.tile_tex_ratio_y = (main.canvas.height / 256.0) * 2.0;
-				main.shader.uniforms.atlas_tex_ratio_x = (main.canvas.width / 512.0) * 2.0;
-				main.shader.uniforms.atlas_tex_ratio_y = (main.canvas.height / 512.0) * 2.0;
+				//main.shader.uniforms.atlas_tex_ratio_x = (main.canvas.width / 512.0) * 2.0;
+				//main.shader.uniforms.atlas_tex_ratio_y = (main.canvas.height / 512.0) * 2.0;
 				main.shader.uniforms.tile_width = (main.column_width / main.canvas.width) / 2.0;
 				main.shader.uniforms.px_tile_width = main.column_width;
 				main.shader.uniforms.tile_height = (main.column_width / main.canvas.height) / 2.0;
+				
+				main.step_trans_shader.uniforms.tile_tex_ratio_x = (main.canvas.width / 256.0) * 2.0;
+				main.step_trans_shader.uniforms.tile_tex_ratio_y = (main.canvas.height / 256.0) * 2.0;
+				main.step_trans_shader.uniforms.tile_width = (main.column_width / main.canvas.width) / 2.0;
+				main.step_trans_shader.uniforms.px_tile_width = main.column_width;
+				main.step_trans_shader.uniforms.tile_height = (main.column_width / main.canvas.height) / 2.0;
 				
 				main.use_shader = true;
 			});
@@ -396,9 +441,9 @@ var Rays = (function() {
 			main.pixi_stage.filters = [main.shader];
 			
 			// testing sprites
-			var sprite = new PIXI.Sprite(main.wall_tex);
-			main.pixi_stage.addChild(sprite);
-			main.pixi_renderer.render(main.pixi_stage);
+			//var sprite = new PIXI.Sprite(main.wall_tex);
+			//main.pixi_stage.addChild(sprite);
+			//main.pixi_renderer.render(main.pixi_stage);
 			
 		}
 		
@@ -506,7 +551,7 @@ var Rays = (function() {
 		main.map_data = null;
 		main.paused = false;
 		main.blur_paused = false;
-		main.player = new main.Player({loc: new main.Pt({x: 5.0, y: 1.0}), dir: Math.PI * 0.5});
+		main.player = new main.Player({loc: new main.Pt({x: 5.0, y: 2.0}), dir: Math.PI * 0.5});
 		main.draw_mode = "solid"; // options are "solid", "edges", or "texture"
 	};
 
@@ -1188,7 +1233,9 @@ var Rays = (function() {
 		}
 		// minimap stuff still using vanilla renderer here
 		else if (main.renderer === "pixi") {
-			//return;
+			//if (main.transition) {
+			//	return;
+			//}
 			// clear mini map
 			if (main.use_minimap) {
 				main.map_ctx.clearRect(-1, -1, main.map_canvas.width + 1, main.map_canvas.height + 1);

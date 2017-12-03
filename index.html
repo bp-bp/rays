@@ -16,6 +16,51 @@
 	<!--
 	TEST TEST TEST
 	-->
+	<script id = "compare_test" type = "shader">
+		varying vec2 vTextureCoord;
+		uniform sampler2D last_frame;
+		uniform vec4 filterArea;
+		uniform vec2 dimensions;
+		
+		vec2 mapCoord( vec2 coord ) {
+			coord *= filterArea.xy;
+			coord += filterArea.zw;
+
+			return coord;
+		}
+
+		vec2 unmapCoord( vec2 coord ) {
+			coord -= filterArea.zw;
+			coord /= filterArea.xy;
+
+			return coord;
+		}
+		
+		void main(void) {
+			
+			// this works but has that weird offset
+			vec2 coord = (mapCoord(vTextureCoord) - filterArea.zw) / dimensions;
+			gl_FragColor = texture2D(last_frame, coord);
+			
+			
+			/*
+			vec2 coord = mapCoord(vTextureCoord) / dimensions;
+			vec2 screen = mapCoord(coord);
+			screen += 4.0;
+			
+			float thing = 0.0;
+			if (screen.y > 0.0) {
+				thing = 1.0;
+			}
+			
+			vec2 color_getter = unmapCoord(screen);
+			
+			vec4 out_color = texture2D(last_frame, color_getter);
+			gl_FragColor = vec4(out_color.r, out_color.g, out_color.b, 1.0);
+			*/
+		}
+		
+	</script>
 	
 	<script id = "step_trans_shader" type = "shader">
 		varying vec2 vTextureCoord;
@@ -25,7 +70,7 @@
 		uniform sampler2D tile_tex1;
 		uniform sampler2D tile_tex2;
 		uniform sampler2D tile_tex3;
-		uniform sampler2D next_frame;
+		uniform sampler2D last_frame;
 		uniform float tile_tex_ratio_x;
 		uniform float tile_tex_ratio_y;
 		uniform vec2 dimensions;
@@ -62,14 +107,27 @@
 			vec2 sq_coord = unmapCoord(px_square_coord);
 			vec4 sq_color = texture2D(uSampler, sq_coord);
 			
+			// the color we'll use for further calculations
+			//vec4 use_color = sq_color;
+			// indicator
+			float indicator = 0.0;
+			
 			// now get the square color of the next frame
-			vec4 next_sq_color = texture2D(next_frame, sq_coord);
-			// get the difference between the square colors
-			vec4 color_diff = abs(sq_color - next_sq_color);
+			vec2 next_sq_coord = (mapCoord(sq_coord) - filterArea.zw) / dimensions;
+			vec4 last_sq_color = texture2D(last_frame, next_sq_coord);
+			
 			
 			// step colors
 			float num_colors = 6.0;
 			sq_color = floor(sq_color * num_colors) / num_colors;
+			last_sq_color = floor(last_sq_color * num_colors) / num_colors;
+			
+			// get the difference between the square colors
+			vec4 color_diff = abs(sq_color - last_sq_color);
+			
+			if (color_diff.r > 0.1) {
+				indicator = 1.0;
+			}
 			
 			// get the various 
 			vec2 tile_tex_ratio = vec2(tile_tex_ratio_x, tile_tex_ratio_y);
@@ -118,7 +176,7 @@
 				out_color = tile_tex3_color;
 			}
 			
-			gl_FragColor = vec4(out_color.r * border , out_color.g * border, out_color.b * border, 1.0);
+			gl_FragColor = vec4(out_color.r * border , out_color.g * border + indicator, out_color.b * border, 1.0);
 			//gl_FragColor = vec4(0.0, fr[0], 0.0, 1.0);
 		}
 	</script>
@@ -156,6 +214,10 @@
 		void main(void){
 			// get screen/px coord
 			vec2 screen = mapCoord(vTextureCoord);
+			
+			// TEST
+			//vec2 coord = mapCoord(vTextureCoord) / dimensions;
+			//vec2 screen = mapCoord(coord);
 			
 			// get px square coord
 			vec2 raw = vec2((screen.x / px_tile_width), (screen.y / px_tile_width));
@@ -245,7 +307,7 @@
 		</header>
 		
 		<div class = "canvas-container">
-			<canvas id = "main_canvas" class = "" width = "800" height = "600"></canvas>
+			<canvas id = "main_canvas" class = "" width = "1024" height = "768"></canvas>
 			<div class = "map-container">
 				<canvas id = "map_bg_canvas" class = "map-canvas bg" width = "600px" height = "600px"></canvas
 				><canvas id = "map_canvas" class = "map-canvas fg" width = "600px" height = "600px"></canvas>
