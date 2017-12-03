@@ -39,7 +39,9 @@
 		void main(void) {
 			
 			// this works but has that weird offset
-			vec2 coord = (mapCoord(vTextureCoord) - filterArea.zw) / dimensions;
+			//vec2 coord = (mapCoord(vTextureCoord) - filterArea.zw) / dimensions;
+			vec2 other_dim = vec2 (1024.0, 768.0);
+			vec2 coord = ((vTextureCoord * filterArea.xy) + filterArea.zw) / other_dim;
 			gl_FragColor = texture2D(last_frame, coord);
 			
 			
@@ -113,7 +115,8 @@
 			float indicator = 0.0;
 			
 			// now get the square color of the next frame
-			vec2 next_sq_coord = (mapCoord(sq_coord) - filterArea.zw) / dimensions;
+			vec2 last_frame_dim = vec2(1024.0, 768.0);
+			vec2 next_sq_coord = ((sq_coord * filterArea.xy) + filterArea.zw) / last_frame_dim; // works!
 			vec4 last_sq_color = texture2D(last_frame, next_sq_coord);
 			
 			
@@ -129,7 +132,7 @@
 				indicator = 1.0;
 			}
 			
-			// get the various 
+			// get the various tile colors
 			vec2 tile_tex_ratio = vec2(tile_tex_ratio_x, tile_tex_ratio_y);
 			vec4 tile_tex0_color = texture2D(tile_tex0, vTextureCoord * tile_tex_ratio);
 			vec4 tile_tex1_color = texture2D(tile_tex1, vTextureCoord * tile_tex_ratio);
@@ -137,23 +140,51 @@
 			vec4 tile_tex3_color = texture2D(tile_tex3, vTextureCoord * tile_tex_ratio);
 			
 			vec4 out_color;
-			if (sq_color.r < 0.1) {
-				out_color = tile_tex0_color;
+			vec4 cur_frame_color;
+			vec4 last_frame_color;
+			
+			//if (indicator == 0.0) {
+				if (sq_color.r < 0.1) {
+					cur_frame_color = tile_tex0_color;
+				}
+				else if (sq_color.r < 0.2) {
+					cur_frame_color = tile_tex1_color;
+				}
+				else if (sq_color.r < 0.4) {
+					cur_frame_color = tile_tex2_color;
+				}
+				else {
+					cur_frame_color = tile_tex3_color;
+				}
+			//}
+			//else if (indicator == 1.0) {
+				if (last_sq_color.r < 0.1) {
+					last_frame_color = tile_tex0_color;
+				}
+				else if (last_sq_color.r < 0.2) {
+					last_frame_color = tile_tex1_color;
+				}
+				else if (last_sq_color.r < 0.4) {
+					last_frame_color = tile_tex2_color;
+				}
+				else {
+					last_frame_color = tile_tex3_color;
+				}
+			//}
+			
+			// pick which color we're using based on diff indicator
+			if (indicator == 1.0) {
+				out_color = last_frame_color;
 			}
-			else if (sq_color.r < 0.2) {
-				out_color = tile_tex1_color;
-			}
-			else if (sq_color.r < 0.4) {
-				out_color = tile_tex2_color;
-			}
-			else {
-				out_color = tile_tex3_color;
+			else if (indicator == 0.0) {
+				out_color = cur_frame_color;
 			}
 			
 			// prep for flip
 			float flip_factor = 1.0;
 			float flip_neg = 1.0; // this guy negates flip_factor when flip condition does not apply
-			if (sq_color.r > 0.1) {
+			//if (sq_color.r > 0.1) {
+			if (indicator == 1.0) {
 				//flip_factor = abs(sin(time));
 				flip_factor = fract(time);
 			}
@@ -173,10 +204,10 @@
 			// sets flip color
 			if (mody > 0.01 && modx > 0.01 && border < 0.01) {
 				border = 1.0;
-				out_color = tile_tex3_color;
+				out_color = cur_frame_color;
 			}
 			
-			gl_FragColor = vec4(out_color.r * border , out_color.g * border + indicator, out_color.b * border, 1.0);
+			gl_FragColor = vec4(out_color.r * border , out_color.g * border, out_color.b * border, 1.0);
 			//gl_FragColor = vec4(0.0, fr[0], 0.0, 1.0);
 		}
 	</script>

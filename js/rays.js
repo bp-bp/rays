@@ -365,11 +365,15 @@ var Rays = (function() {
 				this.uniforms.dimensions[0] = input.sourceFrame.width;
 				this.uniforms.dimensions[1] = input.sourceFrame.height;
 				
+				//console.log("dimensions: ", this.uniforms.dimensions);
+				//console.log("filterManager: ", filterManager);
+				//console.log("input; ", input);
+				
 				filterManager.applyFilter(this, input, output);
 			};
 			
 			// step transition shader
-			var trans_shader_code = document.getElementById("compare_test").innerHTML;
+			var trans_shader_code = document.getElementById("step_trans_shader").innerHTML;
 			main.step_trans_shader = new PIXI.Filter("", trans_shader_code);
 			main.step_trans_shader.uniforms.time = 0.0;
 			main.step_trans_shader.uniforms.screen_width = main.canvas.width;
@@ -377,9 +381,13 @@ var Rays = (function() {
 			main.step_trans_shader.uniforms.dimensions = {type: "v2", value: [main.canvas.width, main.canvas.height]};
 			main.step_trans_shader.dontFit = true;
 			
+			
 			main.step_trans_shader.apply = function(filterManager, input, output) {
 				this.uniforms.dimensions[0] = input.sourceFrame.width;
 				this.uniforms.dimensions[1] = input.sourceFrame.height;
+				
+				//console.log("filterManager: ", filterManager);
+				//console.log("input; ", input);
 				
 				filterManager.applyFilter(this, input, output);
 			};
@@ -1270,7 +1278,7 @@ var Rays = (function() {
 			}
 			
 			if (main.pixi_stage.filters && main.pixi_stage.filters.length) {
-				main.pixi_stage.filters[0].uniforms.time = performance.now() / 3000.0;//+= 0.002;
+				main.pixi_stage.filters[0].uniforms.time = performance.now() / 2000.0;//+= 0.002;
 			}
 			main.pixi_renderer.render(main.pixi_stage);
 		}
