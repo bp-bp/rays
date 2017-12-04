@@ -187,35 +187,42 @@ var Rays = (function() {
 			return false;
 		};
 		
+		
+		
 		// moves the player stepwise
 		main.Player.prototype.move_step = function(move) {
 			var play = this;
 			
 			// TEST TEST TEST doesn't belong here
 			// copy current frame without shader
-			
-			console.log("rendertexture: ", main.pixi_tex_buff);
-			console.log("stage: ", main.pixi_stage);
-			
+			/*
 			main.pixi_stage.filters = [];
 			main.pixi_renderer.render(main.pixi_stage, main.pixi_tex_buff);
 			
-			
 			main.step_trans_shader.uniforms.last_frame = main.pixi_tex_buff;
 			main.pixi_stage.filters = [main.step_trans_shader];
-			//console.log("filterarea: ", main.step_trans_shader.uniforms.filterArea);
-			main.transition = true;
 			
+			main.transition = true;
+			*/
 			//console.log(main.pixi_tex_buff);
+			//if (main.anim_state) {
+			//	return;
+			//}
+			
+			//console.log(move);
+			if (move.frame_step == undefined) {
+				main.prep_step_animation(move);
+			}
+			//console.log(move)
 			
 			if (move.move_type === "step") {
 				var move_vec = new main.Pt({x: Math.cos(play.dir), y: Math.sin(play.dir)});
-				move_vec.mul(move.quant);
+				move_vec.mul(move.frame_step);
 				play.loc.x += move_vec.x;
 				play.loc.y += move_vec.y;
 			}
 			else if (move.move_type = "turn") {
-				play.dir += (move.quant * Math.PI);
+				play.dir += (move.frame_step * Math.PI);
 			}
 		};
 		
@@ -423,14 +430,8 @@ var Rays = (function() {
 				main.shader.uniforms.tile_tex3 = tile_tex3;
 				main.step_trans_shader.uniforms.tile_tex3 = tile_tex3;
 				
-				//var tile_tex_atlas = resources["tile_tex_atlas"].texture;
-				//tile_tex_atlas.baseTexture.wrapMode = PIXI.WRAP_MODES.REPEAT;
-				//main.shader.uniforms.tile_tex_atlas = tile_tex_atlas;
-				
 				main.shader.uniforms.tile_tex_ratio_x = (main.canvas.width / 256.0) * 2.0;
 				main.shader.uniforms.tile_tex_ratio_y = (main.canvas.height / 256.0) * 2.0;
-				//main.shader.uniforms.atlas_tex_ratio_x = (main.canvas.width / 512.0) * 2.0;
-				//main.shader.uniforms.atlas_tex_ratio_y = (main.canvas.height / 512.0) * 2.0;
 				main.shader.uniforms.tile_width = (main.column_width / main.canvas.width) / 2.0;
 				main.shader.uniforms.px_tile_width = main.column_width;
 				main.shader.uniforms.tile_height = (main.column_width / main.canvas.height) / 2.0;
@@ -448,26 +449,7 @@ var Rays = (function() {
 
 			main.pixi_stage.filters = [main.shader];
 			
-			// testing sprites
-			//var sprite = new PIXI.Sprite(main.wall_tex);
-			//main.pixi_stage.addChild(sprite);
-			//main.pixi_renderer.render(main.pixi_stage);
-			
 		}
-		
-		// TEST TEST TEST
-		/*
-		main.test_canvas = document.createElement("canvas");
-		main.test_canvas.width = 512;
-		main.test_canvas.height = 512;
-		document.body.appendChild(main.test_canvas);
-		main.test_canvas_ctx = main.test_canvas.getContext("2d");
-		main.test_canvas_ctx.imageSmoothingEnabled = false;
-		main.test_canvas_ctx.msImageSmoothingEnabled = false;
-		main.test_canvas_ctx.mozImageSmoothingEnabled = false;
-		main.test_canvas_ctx.webkitImageSmoothingEnabled = false;
-		main.test_canvas_ctx.translate(0.5, 0.5);
-		*/
 		
 		// handle controls
 		if (! main.controls_container) {
@@ -554,6 +536,7 @@ var Rays = (function() {
 		
 		// input/movement state 
 		main.move_state = {forward: false, backward: false, turn_left: false, turn_right: false};
+		main.anim_state = null;
 		
 		// app stuff
 		main.map_data = null;
@@ -566,6 +549,87 @@ var Rays = (function() {
 	Main.prototype.dt = function() {
 		var main = this; 
 		return main.current_tick - main.last_tick;
+	};
+	
+	// stepwise animation stuff
+	// modifies parameter and returns to move_step calling function
+	Main.prototype.prep_step_animation = function(move) {
+		var main = this;
+		
+		// remove regular shader from stage
+		main.pixi_stage.filters = [];
+		// copy current frame to buffer without shader
+		main.pixi_renderer.render(main.pixi_stage, main.pixi_tex_buff);
+		// set up transition shader
+		main.step_trans_shader.uniforms.last_frame = main.pixi_tex_buff;
+		
+		// animation state
+		main.anim_state = {};
+		
+		// make calculations and prep animation state object
+		main.anim_state.frame_total = 2.0; // number of frames animation will take
+		main.anim_state.anim_dur = 750; // duration of the whole animation in milliseconds
+		main.anim_state.flip_dur = 0.75; // fraction of a frame that the flip animation should take
+		main.anim_state.frame_step = move.quant / main.anim_state.frame_total;
+		move.frame_step = main.anim_state.frame_step;
+		main.anim_state.frame_dur = main.anim_state.anim_dur / main.anim_state.frame_total;
+		main.anim_state.frame_num = 1;
+		main.anim_state.start_time = performance.now();
+		main.anim_state.time_tick = function() {
+			var elapsed = performance.now() - this.start_time;
+			//console.log("elapsed: ", elapsed);
+			var fract = elapsed / (this.frame_dur * this.flip_dur);
+			//console.log("fract: ", fract);
+			fract = fract > 1.0 ? 1.0 : fract; // animation is finished if greater than 1
+			return fract;
+		};
+		main.anim_state.move = move;
+
+		console.log("start");
+		console.log("anim_state: ", main.anim_state);
+
+		// set timeout for next pseudo-frame
+		main.anim_state.timeout = setTimeout(main.continue_step_animation.bind(main), main.anim_state.frame_dur);
+		// set shader to transition shader
+		main.pixi_stage.filters = [main.step_trans_shader];
+	};
+	
+	Main.prototype.continue_step_animation = function() {
+		var main = this;
+		
+		
+		if (! main.anim_state) {
+			console.log("well this shouldn't happen");
+			return;
+		}
+		
+		main.anim_state.frame_num += 1;
+		
+		console.log("continue");
+		console.log("anim_state: ", main.anim_state);
+		
+		// check if we're finished
+		if (main.anim_state.frame_num > main.anim_state.frame_total) {
+			main.anim_state = null;
+			main.pixi_stage.filters = [main.shader];
+			console.log("done");
+			return;
+		}
+		else {
+			main.pixi_stage.filters = [];
+			main.pixi_renderer.render(main.pixi_stage, main.pixi_tex_buff);
+			
+			main.step_trans_shader.uniforms.last_frame = main.pixi_tex_buff;
+			main.pixi_stage.filters = [main.step_trans_shader];
+			
+			main.anim_state.start_time = performance.now();
+			main.anim_state.timeout = setTimeout(main.continue_step_animation.bind(main), main.anim_state.frame_dur);
+			main.player.move_step(main.anim_state.move);
+		}
+		
+		
+		
+		
 	};
 	
 	// callbacks for display mode buttons
@@ -899,7 +963,7 @@ var Rays = (function() {
 				main.move_state.forward = val;
 			}
 			// ! val to trigger on keyup
-			else if (main.move_mode === "step" && ! val) {
+			else if (main.move_mode === "step" && ! val && ! main.anim_state) {
 				main.player.move_step({move_type: "step", quant: 1.0});
 			}
 		}
@@ -908,7 +972,7 @@ var Rays = (function() {
 				main.move_state.backward = val;
 			}
 			// ! val to trigger on keyup
-			else if (main.move_mode === "step" && ! val) {
+			else if (main.move_mode === "step" && ! val && ! main.anim_state) {
 				main.player.move_step({move_type: "step", quant: -1.0});
 			}
 		}
@@ -1269,7 +1333,6 @@ var Rays = (function() {
 			main.pixi_graphics.clear();
 			main.pixi_graphics.beginFill(0x000000);
 			main.pixi_graphics.drawRect(0, 0, main.canvas.width, main.canvas.height);
-			//main.pixi_stage.removeChild(main.pixi_graphics);
 			if (main.draw_mode === "solid") {
 				main.draw_batched_view_rects_pixi();
 			}
@@ -1278,7 +1341,10 @@ var Rays = (function() {
 			}
 			
 			if (main.pixi_stage.filters && main.pixi_stage.filters.length) {
-				main.pixi_stage.filters[0].uniforms.time = performance.now() / 2000.0;//+= 0.002;
+				//main.pixi_stage.filters[0].uniforms.time = performance.now() / 2000.0;
+				if (main.anim_state) {
+					main.pixi_stage.filters[0].uniforms.time = main.anim_state.time_tick();
+				}
 			}
 			main.pixi_renderer.render(main.pixi_stage);
 		}

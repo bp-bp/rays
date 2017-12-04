@@ -186,7 +186,7 @@
 			//if (sq_color.r > 0.1) {
 			if (indicator == 1.0) {
 				//flip_factor = abs(sin(time));
-				flip_factor = fract(time);
+				flip_factor = time;//fract(time);
 			}
 			else {
 				flip_neg = 0.0;
@@ -225,7 +225,6 @@
 		uniform vec2 dimensions;
 		uniform vec4 filterArea;
 		uniform float px_tile_width;
-		uniform float time;
 		
 		
 		vec2 mapCoord( vec2 coord ) {
@@ -285,16 +284,6 @@
 				out_color = tile_tex3_color;
 			}
 			
-			// prep for flip
-			float flip_factor = 1.0;
-			float flip_neg = 1.0; // this guy negates flip_factor when flip condition does not apply
-			if (sq_color.r > 0.1) {
-				//flip_factor = abs(sin(time));
-				flip_factor = fract(time);
-			}
-			else {
-				flip_neg = 0.0;
-			}
 			
 			// get border
 			float modx = 0.0;
@@ -302,14 +291,8 @@
 			float bordx = step(1.0, modx);
 			float mody = 0.0;
 			mody = floor(mod(screen.y, px_tile_width));
-			float bordy = step(1.0, mody - (flip_factor * px_tile_width * flip_neg)); // flip is here
+			float bordy = step(1.0, mody); 
 			float border = bordx * bordy;
-			
-			// sets flip color
-			if (mody > 0.01 && modx > 0.01 && border < 0.01) {
-				border = 1.0;
-				out_color = tile_tex3_color;
-			}
 			
 			gl_FragColor = vec4(out_color.r * border , out_color.g * border, out_color.b * border, 1.0);
 			//gl_FragColor = vec4(0.0, fr[0], 0.0, 1.0);
@@ -330,11 +313,6 @@
 		<header>
 			<h3>FPS: <span id = "fps_field"></span></h3>
 			<div id = "rays_controls_container"></div>
-			<!--
-			<button id = "solid_mode_button">Solid</button>
-			<button id = "textured_mode_button">Textured</button>
-			<button id = "edge_mode_button">Edges</button>
-			-->
 		</header>
 		
 		<div class = "canvas-container">
