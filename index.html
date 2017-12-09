@@ -45,13 +45,32 @@
 			return (abs(num1 - num2) <= range);
 		}
 		
+		float get_flip(vec2 fr, float prog) {
+			// some constants
+			float width = 0.5;
+			float round = 1.0;
+			float pi = 3.1415927;
+			
+			// begin
+			vec2 uv = vec2(2.0 * fr - 1.0);
+			vec3 r = vec3(uv, 3.0);
+			vec3 n = vec3(0.0, sin(prog * pi), cos(prog * pi));
+			float t = (r.z * n.z)/dot(n, r);
+			vec3 p = r * t;
+			vec2 q = vec2(p.x, p.y/n.z);
+			float flipped = round - length(q - clamp(q, -width, width));
+			
+			return flipped;
+		}
+		
+		
 		void main(void){
 			// get screen/px coord
 			vec2 screen = mapCoord(vTextureCoord);
 			
 			// get px square coord
 			vec2 raw = vec2((screen.x / px_tile_width), (screen.y / px_tile_width));
-			vec2 f = fract(raw);
+			vec2 fr = fract(raw);
 			vec2 px_square_coord = vec2(floor(raw.x) * px_tile_width, floor(raw.y) * px_tile_width);
 			px_square_coord += 0.5; // prevents bleeding
 			
@@ -65,7 +84,7 @@
 			// screen percent between 0 and 1 for scanline
 			float screen_y_pct = (mapCoord(vTextureCoord) / dimensions).y;
 			// duration of flip animation in percent screen height
-			float flip_dur = 0.6;
+			float flip_dur = 0.2;
 			// flip_p is progress of flip between 0 and 1
 			float flip_p = clamp((time - screen_y_pct) / flip_dur, 0.0, 1.0);
 			
@@ -75,38 +94,12 @@
 			float bordx = step(1.0, modx);
 			float mody = 0.0;
 			mody = floor(mod(screen.y, px_tile_width));
-			float height_in_tile = (mody / px_tile_width);
 			float bordy = step(1.0, mody);
-			//float flipped = step(flip_p * 3.14159, height_in_tile);
 			
-			//* wut *// holy shit this works
-			// setup wut
-			float width = 0.5;
-			float round = 1.0;
-			// enact wut
-			vec2 uv_thing = vec2(2.0 * f - 1.0);
-			vec3 r = vec3(uv_thing, 3.0);
-			vec3 n = vec3(0.0, sin(flip_p * 3.14159), cos(flip_p * 3.14159));
-			float t = (r.z * n.z)/dot(n, r);
-			vec3 p = r * t;
-			vec2 q = vec2(p.x, p.y/n.z);
-			//flipped = length(q);
-			float flipped = round - length(q - clamp(q, -width, width));
-			
-			flipped = floor(flipped*4.0) / 4.0;
-			
-			//if (flipped < 0.01) {
-			//	out_color.g = 1.0;
-			//}
+			// call flip here
+			float flipped = get_flip(fr, flip_p);
 			
 			float border = bordx * bordy;
-			//flipped = (1.0-flipped) * border;
-			
-			// sets flip color if border was set to vec2(0,0) but we're not actually on a border
-			//if (mody > 0.01 && modx > 0.01 && flipped < 0.01) {
-			//	border = 1.0;
-			//	out_color = vec4(0.0, 0.0, 0.5, 1.0);
-			//}
 			
 			//flipped = clamp(flipped, 0.5, 1.0);
 			out_color = out_color * flipped;
@@ -210,6 +203,7 @@
 		uniform float tile_tex_ratio_y;
 		uniform vec2 dimensions;
 		uniform vec2 canvas_size;
+		uniform vec2 unif_last_frame_dim;
 		uniform vec4 filterArea;
 		uniform float px_tile_width;
 		uniform float time;
@@ -233,12 +227,31 @@
 			return (abs(num1 - num2) <= range);
 		}
 		
+		float get_flip(vec2 fr, float prog) {
+			// some constants
+			float width = 0.5;
+			float round = 0.8;
+			float pi = 3.1415927;
+			
+			// begin
+			vec2 uv = vec2(2.0 * fr - 1.0);
+			vec3 r = vec3(uv, 3.0);
+			vec3 n = vec3(0.0, sin(prog * pi), cos(prog * pi));
+			float t = (r.z * n.z)/dot(n, r);
+			vec3 p = r * t;
+			vec2 q = vec2(p.x, p.y/n.z);
+			float flipped = round - length(q - clamp(q, -width, width));
+			
+			return flipped * ((1.0 / round) + 0.1);
+		}
+		
 		void main(void){
 			// get screen/px coord
 			vec2 screen = mapCoord(vTextureCoord);
 			
 			// get px square coord
 			vec2 raw = vec2((screen.x / px_tile_width), (screen.y / px_tile_width));
+			vec2 fr = fract(raw);
 			vec2 px_square_coord = vec2(floor(raw.x) * px_tile_width, floor(raw.y) * px_tile_width);
 			px_square_coord += 0.5; // prevents bleeding
 			
@@ -283,10 +296,10 @@
 			if (sq_color.r < 0.1) {
 				cur_frame_color = tile_tex0_color;
 			}
-			else if (sq_color.r < 0.2) {
+			else if (sq_color.r < 0.3) {
 				cur_frame_color = tile_tex1_color;
 			}
-			else if (sq_color.r < 0.4) {
+			else if (sq_color.r < 0.6) {
 				cur_frame_color = tile_tex2_color;
 			}
 			else {
@@ -297,10 +310,10 @@
 			if (last_sq_color.r < 0.1) {
 				last_frame_color = tile_tex0_color;
 			}
-			else if (last_sq_color.r < 0.2) {
+			else if (last_sq_color.r < 0.3) {
 				last_frame_color = tile_tex1_color;
 			}
-			else if (last_sq_color.r < 0.4) {
+			else if (last_sq_color.r < 0.6) {
 				last_frame_color = tile_tex2_color;
 			}
 			else {
@@ -315,13 +328,21 @@
 				out_color = cur_frame_color;
 			}
 			
+			// adds some randomness to the flip phase
+			float flip_phase_offset = texture2D(tile_tex1, sq_coord * tile_tex_ratio).r;
 			
 			// screen percent between 0 and 1 for scanline
 			float screen_y_pct = (mapCoord(vTextureCoord) / dimensions).y;
-			// duration of flip animation in percent screen height
-			float flip_dur = 0.2;
+			// duration of flip animation in percent screen height, used only with scanline
+			float flip_dur = 0.5;
 			// flip_p is progress of flip between 0 and 1
-			float flip_p = clamp((time - screen_y_pct) / flip_dur, 0.0, 1.0);
+			float flip_p;
+			// flip_p = clamp((time - screen_y_pct) / flip_dur, 0.0, 1.0); // use for scanline effect
+			flip_p = time + flip_phase_offset; // use to flip all tiles at once, no scanline
+			
+			if (indicator == 0.0) {
+				flip_p = 0.0;
+			}
 			
 			// get border
 			float modx = 0.0;
@@ -331,14 +352,23 @@
 			mody = floor(mod(screen.y, px_tile_width));
 			float height_in_tile = (mody / px_tile_width);
 			float bordy = step(1.0, mody);
-			float flipped = step(flip_p, height_in_tile);
+			//float flipped = step(flip_p, height_in_tile);
 			float border = bordx * bordy;
 			
+			float tile_shape = get_flip(fr, flip_p);
+			//tile_shape = clamp(tile_shape, tile_tex0_color.b, 1.0);
+			//tile_shape = clamp(tile_shape, 0.25, 1.0);
+			
 			// sets flip color if border was set to vec2(0,0) but we're not actually on a border
-			if (mody > 0.01 && modx > 0.01 && flipped < 0.01) {
+			if (mody > 0.01 && modx > 0.01 && tile_shape < 0.01) {
 				border = 1.0;
 				out_color = cur_frame_color;
 			}
+			
+			// pick tile output color by checking that we're more than halfway through the flip
+			out_color = mix(cur_frame_color, last_frame_color, step(flip_p, 0.5)) * tile_shape;
+			
+			border = 1.0;//clamp(border, 0.3, 1.0);
 			
 			gl_FragColor = vec4(out_color.r * border , out_color.g * border, out_color.b * border, 1.0);
 		}
@@ -373,6 +403,25 @@
 			return coord;
 		}
 		
+		float get_flip(vec2 fr, float prog) {
+			// some constants
+			float width = 0.5;
+			float round = 0.8;
+			float pi = 3.1415927;
+			
+			// begin
+			vec2 uv = vec2(2.0 * fr - 1.0);
+			vec3 r = vec3(uv, 3.0);
+			vec3 n = vec3(0.0, sin(prog * pi), cos(prog * pi));
+			float t = (r.z * n.z)/dot(n, r);
+			vec3 p = r * t;
+			vec2 q = vec2(p.x, p.y/n.z);
+			float flipped = round - length(q - clamp(q, -width, width));
+			
+			return flipped * ((1.0 / round) + 0.1);
+			//return flipped;
+		}
+		
 		void main(void){
 			// get screen/px coord
 			vec2 screen = mapCoord(vTextureCoord);
@@ -383,6 +432,7 @@
 			
 			// get px square coord
 			vec2 raw = vec2((screen.x / px_tile_width), (screen.y / px_tile_width));
+			vec2 fr = fract(raw);
 			vec2 px_square_coord = vec2(floor(raw.x) * px_tile_width, floor(raw.y) * px_tile_width);
 			px_square_coord += 0.5; // prevents bleeding
 			
@@ -406,10 +456,10 @@
 			if (sq_color.r < 0.1) {
 				out_color = tile_tex0_color;
 			}
-			else if (sq_color.r < 0.2) {
+			else if (sq_color.r < 0.3) {
 				out_color = tile_tex1_color;
 			}
-			else if (sq_color.r < 0.4) {
+			else if (sq_color.r < 0.6) {
 				out_color = tile_tex2_color;
 			}
 			else {
@@ -425,6 +475,11 @@
 			mody = floor(mod(screen.y, px_tile_width));
 			float bordy = step(1.0, mody); 
 			float border = bordx * bordy;
+			
+			float tile_shape = get_flip(fr, 0.0);
+			out_color = out_color * tile_shape;
+			
+			border = 1.0;//clamp(border, 0.3, 1.0);
 			
 			gl_FragColor = vec4(out_color.r * border , out_color.g * border, out_color.b * border, 1.0);
 			//gl_FragColor = vec4(0.0, fr[0], 0.0, 1.0);

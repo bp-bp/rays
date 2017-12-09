@@ -187,29 +187,28 @@ var Rays = (function() {
 			return false;
 		};
 		
+		// adds a step to the movement queue
+		main.Player.prototype.enqueue_step = function(move) {
+			var play = this;
+			
+			main.step_queue.push(move);
+			// start step if we haven't yet
+			if (! main.anim_state && main.step_queue.length) {
+				play.move_step(play.dequeue_step());
+			}
+		};
 		
+		// pops the next step from the movement queue
+		main.Player.prototype.dequeue_step = function() {
+			var play = this;
+			
+			return main.step_queue.shift();
+		};
 		
 		// moves the player stepwise
 		main.Player.prototype.move_step = function(move) {
 			var play = this;
 			
-			// TEST TEST TEST doesn't belong here
-			// copy current frame without shader
-			/*
-			main.pixi_stage.filters = [];
-			main.pixi_renderer.render(main.pixi_stage, main.pixi_tex_buff);
-			
-			main.step_trans_shader.uniforms.last_frame = main.pixi_tex_buff;
-			main.pixi_stage.filters = [main.step_trans_shader];
-			
-			main.transition = true;
-			*/
-			//console.log(main.pixi_tex_buff);
-			//if (main.anim_state) {
-			//	return;
-			//}
-			
-			//console.log(move);
 			if (move.frame_step == undefined) {
 				main.prep_step_animation(move);
 			}
@@ -296,6 +295,7 @@ var Rays = (function() {
 		main.fps_field = init.fps_field || null;
 		main.controls_container = init.controls_container || null;
 		main.map_file_name = init.map_file_name || null;
+		main.use_shader = true;
 		main.wall_tex_file_name = init.wall_tex_file_name || null;
 		main.wall_tex = null; // will be loaded
 		main.column_width = parseFloat(init.column_width) || 6.0; // I guess 6 is a reasonable default
@@ -303,6 +303,13 @@ var Rays = (function() {
 		main.max_view_dist = parseFloat(init.max_view_dist) || 20.0;
 		main.move_speed = parseFloat(init.move_speed) || 10.0; // in map units per second
 		main.move_mode = init.move_mode || null; // options are "smooth" and "step"
+		main.move_anim_duration = null; // duration of step movement animation cycle
+		main.move_anim_pseudo_frame_count = null; // number of pseudo-frames calculated for step movement animation cycle
+		// these last two are only valid in step movement mode
+		if (main.move_mode === "step") {
+			main.move_anim_duration = init.move_anim_duration || null;
+			main.move_anim_pseudo_frame_count = init.move_anim_psuedo_frame_count || null;
+		}
 		
 		// check that we got a file name for the map
 		if (! main.map_file_name) {
@@ -360,7 +367,7 @@ var Rays = (function() {
 			PIXI.SCALE_MODES.DEFAULT =1;// PIXI.SCALE_MODES.NEAREST;
 			console.log(PIXI.settings);
 			// shader
-			var shader_code = document.getElementById("simple_test").innerHTML;
+			var shader_code = document.getElementById("shader").innerHTML;
 			main.shader = new PIXI.Filter("", shader_code);
 			main.shader.uniforms.time = 0.0;
 			main.shader.uniforms.screen_width = main.canvas.width;
@@ -400,11 +407,15 @@ var Rays = (function() {
 			// get our tile textures
 			// these should go in an atlas
 			var loader = new PIXI.loaders.Loader();
-			loader.add("tile_tex0", "textures/wood_tiles/black_wood.jpg");
-			loader.add("tile_tex1", "textures/wood_tiles/dark_wood.jpg");
-			loader.add("tile_tex2", "textures/wood_tiles/medium_wood.jpg");
-			loader.add("tile_tex3", "textures/wood_tiles/light_wood.jpg");
-			//loader.add("tile_tex_atlas", "wood_atlas.png");
+			//loader.add("tile_tex0", "textures/wood_tiles/black_wood.jpg");
+			//loader.add("tile_tex1", "textures/wood_tiles/dark_wood.jpg");
+			//loader.add("tile_tex2", "textures/wood_tiles/medium_wood.jpg");
+			//loader.add("tile_tex3", "textures/wood_tiles/light_wood.jpg");
+			
+			loader.add("tile_tex0", "textures/marble_tiles/0_good.jpg");
+			loader.add("tile_tex1", "textures/marble_tiles/1_good.jpg");
+			loader.add("tile_tex2", "textures/marble_tiles/2_good.jpg");
+			loader.add("tile_tex3", "textures/marble_tiles/3_good.jpg");
 			
 			loader.load(function(loader, resources) {
 				// once loaded, give them to the tile shader
@@ -428,24 +439,26 @@ var Rays = (function() {
 				main.shader.uniforms.tile_tex3 = tile_tex3;
 				main.step_trans_shader.uniforms.tile_tex3 = tile_tex3;
 				
-				main.shader.uniforms.tile_tex_ratio_x = (main.canvas.width / 256.0) * 2.0;
-				main.shader.uniforms.tile_tex_ratio_y = (main.canvas.height / 256.0) * 2.0;
+				main.shader.uniforms.tile_tex_ratio_x = (main.canvas.width / 256.0) * 1.4142;// * 2.0; // sqrt two???
+				main.shader.uniforms.tile_tex_ratio_y = (main.canvas.height / 256.0) * 1.4142;// * 2.0;
 				main.shader.uniforms.tile_width = (main.column_width / main.canvas.width) / 2.0;
 				main.shader.uniforms.px_tile_width = main.column_width;
 				main.shader.uniforms.tile_height = (main.column_width / main.canvas.height) / 2.0;
 				
-				main.step_trans_shader.uniforms.tile_tex_ratio_x = (main.canvas.width / 256.0) * 2.0;
-				main.step_trans_shader.uniforms.tile_tex_ratio_y = (main.canvas.height / 256.0) * 2.0;
+				main.step_trans_shader.uniforms.tile_tex_ratio_x = (main.canvas.width / 256.0) * 1.4142;// * 2.0;
+				main.step_trans_shader.uniforms.tile_tex_ratio_y = (main.canvas.height / 256.0) * 1.4142;// * 2.0;
 				main.step_trans_shader.uniforms.tile_width = (main.column_width / main.canvas.width) / 2.0;
 				main.step_trans_shader.uniforms.px_tile_width = main.column_width;
 				main.step_trans_shader.uniforms.tile_height = (main.column_width / main.canvas.height) / 2.0;
 				
-				main.use_shader = true;
+				
 			});
 
 			main.pixi_stage.addChild(main.pixi_graphics);
-
-			main.pixi_stage.filters = [main.shader];
+			
+			if (main.use_shader) {
+				main.pixi_stage.filters = [main.shader];
+			}
 			
 		}
 		
@@ -540,6 +553,7 @@ var Rays = (function() {
 		main.map_data = null;
 		main.paused = false;
 		main.blur_paused = false;
+		main.step_queue = [];
 		main.player = new main.Player({loc: new main.Pt({x: 5.0, y: 3.0}), dir: Math.PI * 0.5});
 		main.draw_mode = "solid"; // options are "solid", "edges", or "texture"
 	};
@@ -565,8 +579,8 @@ var Rays = (function() {
 		main.anim_state = {};
 		
 		// make calculations and prep animation state object
-		main.anim_state.frame_total = 1.0; // number of frames animation will take
-		main.anim_state.anim_dur = 1000; // duration of the whole animation in milliseconds
+		main.anim_state.frame_total = main.move_anim_pseudo_frame_count;//2.0; // number of frames animation will take
+		main.anim_state.anim_dur = main.move_anim_duration; // duration of the whole animation in milliseconds
 		main.anim_state.flip_dur = 1.0; // fraction of a frame that the flip animation should take
 		main.anim_state.frame_step = move.quant / main.anim_state.frame_total;
 		move.frame_step = main.anim_state.frame_step;
@@ -587,7 +601,9 @@ var Rays = (function() {
 		// set timeout for next pseudo-frame
 		main.anim_state.timeout = setTimeout(main.continue_step_animation.bind(main), main.anim_state.frame_dur);
 		// set shader to transition shader
-		main.pixi_stage.filters = [main.step_trans_shader];
+		if (main.use_shader) {
+			main.pixi_stage.filters = [main.step_trans_shader];
+		}
 	};
 	
 	Main.prototype.continue_step_animation = function() {
@@ -607,7 +623,15 @@ var Rays = (function() {
 		// check if we're finished
 		if (main.anim_state.frame_num > main.anim_state.frame_total) {
 			main.anim_state = null;
-			main.pixi_stage.filters = [main.shader];
+			if (main.use_shader) {
+				main.pixi_stage.filters = [main.shader];
+			}
+			
+			// see if there's another step in the queue, if so kick it off
+			if (main.step_queue.length) {
+				main.player.move_step(main.player.dequeue_step());
+			}
+			
 			console.log("done");
 			return;
 		}
@@ -616,7 +640,10 @@ var Rays = (function() {
 			main.pixi_renderer.render(main.pixi_stage, main.pixi_tex_buff);
 			
 			main.step_trans_shader.uniforms.last_frame = main.pixi_tex_buff;
-			main.pixi_stage.filters = [main.step_trans_shader];
+			main.step_trans_shader.uniforms.unif_last_frame_dim = {type: "v2", value: [main.pixi_tex_buff.width, main.pixi_tex_buff.height]};
+			if (main.use_shader) {
+				main.pixi_stage.filters = [main.step_trans_shader];
+			}
 			
 			main.anim_state.start_time = performance.now();
 			main.anim_state.timeout = setTimeout(main.continue_step_animation.bind(main), main.anim_state.frame_dur);
@@ -959,8 +986,8 @@ var Rays = (function() {
 				main.move_state.forward = val;
 			}
 			// ! val to trigger on keyup
-			else if (main.move_mode === "step" && ! val && ! main.anim_state) {
-				main.player.move_step({move_type: "step", quant: 2.0});
+			else if (main.move_mode === "step" && ! val) {
+				main.player.enqueue_step({move_type: "step", quant: 2.0});
 			}
 		}
 		else if (e.code === "KeyS" || e.key === "s" || e.key === "S") {
@@ -968,8 +995,8 @@ var Rays = (function() {
 				main.move_state.backward = val;
 			}
 			// ! val to trigger on keyup
-			else if (main.move_mode === "step" && ! val && ! main.anim_state) {
-				main.player.move_step({move_type: "step", quant: -2.0});
+			else if (main.move_mode === "step" && ! val) {
+				main.player.enqueue_step({move_type: "step", quant: -2.0});
 			}
 		}
 		else if (e.code === "KeyA" || e.key === "a" || e.key === "A") {
@@ -977,7 +1004,7 @@ var Rays = (function() {
 				main.move_state.turn_left = val;
 			}
 			else if (main.move_mode === "step" && ! val) {
-				main.player.move_step({move_type: "turn", quant: -0.5});
+				main.player.enqueue_step({move_type: "turn", quant: -0.5});
 			}
 		}
 		else if (e.code === "KeyD"|| e.key === "d" || e.key === "D") {
@@ -985,7 +1012,7 @@ var Rays = (function() {
 				main.move_state.turn_right = val;
 			}
 			else if (main.move_mode === "step" && ! val) {
-				main.player.move_step({move_type: "turn", quant: 0.5});
+				main.player.enqueue_step({move_type: "turn", quant: 0.5});
 			}
 		}
 	};
@@ -1341,7 +1368,7 @@ var Rays = (function() {
 					main.pixi_stage.filters[0].uniforms.time = main.anim_state.time_tick();
 				}
 				// TEST TEST TEST
-				main.pixi_stage.filters[0].uniforms.time = performance.now() / 3000.0;//(performance.now() / 1000.0) % 1.0;
+				//main.pixi_stage.filters[0].uniforms.time = performance.now() / 2000.0;//(performance.now() / 1000.0) % 1.0;
 			}
 			
 			

@@ -10,11 +10,13 @@ window.addEventListener("load", function() {
 								, map_bg_canvas: map_bg_canvas
 								, use_minimap: true
 								, map_file_name: "map.png"
-								, wall_tex_file_name: "wall_tex.png"
+								, wall_tex_file_name: "wall_tex2.png"
 								, renderer: "pixi" 
 								, max_view_dist: 20.0
-								, column_width: 10.0
+								, column_width: 6.0
 								, move_speed: 10.0
+								, move_anim_duration: 1000.0
+								, move_anim_psuedo_frame_count: 1.0
 								, move_mode: "step"
 								, fps_field: fps_field
 								, controls_container: controls_container});
