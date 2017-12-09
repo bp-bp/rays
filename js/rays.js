@@ -383,10 +383,12 @@ var Rays = (function() {
 			var trans_shader_code = document.getElementById("step_trans_shader").innerHTML;
 			main.step_trans_shader = new PIXI.Filter("", trans_shader_code);
 			main.step_trans_shader.uniforms.time = 0.0;
-			main.step_trans_shader.uniforms.screen_width = main.canvas.width;
-			main.step_trans_shader.blendMode = PIXI.BLEND_MODES.NORMAL;
+			main.step_trans_shader.uniforms.canvas_size = {type: "v2", value: [main.canvas.width, main.canvas.height]};
+			
+			// the dimensions uniform will get changed in shader.apply function below for behind-the-scenes voodoo pixi.js reasons
 			main.step_trans_shader.uniforms.dimensions = {type: "v2", value: [main.canvas.width, main.canvas.height]};
 			main.step_trans_shader.dontFit = true;
+			main.step_trans_shader.blendMode = PIXI.BLEND_MODES.NORMAL;
 			
 			
 			main.step_trans_shader.apply = function(filterManager, input, output) {
@@ -542,7 +544,7 @@ var Rays = (function() {
 		main.map_data = null;
 		main.paused = false;
 		main.blur_paused = false;
-		main.player = new main.Player({loc: new main.Pt({x: 5.0, y: 2.0}), dir: Math.PI * 0.5});
+		main.player = new main.Player({loc: new main.Pt({x: 5.0, y: 3.0}), dir: Math.PI * 0.5});
 		main.draw_mode = "solid"; // options are "solid", "edges", or "texture"
 	};
 
@@ -567,9 +569,9 @@ var Rays = (function() {
 		main.anim_state = {};
 		
 		// make calculations and prep animation state object
-		main.anim_state.frame_total = 2.0; // number of frames animation will take
-		main.anim_state.anim_dur = 750; // duration of the whole animation in milliseconds
-		main.anim_state.flip_dur = 0.75; // fraction of a frame that the flip animation should take
+		main.anim_state.frame_total = 1.0; // number of frames animation will take
+		main.anim_state.anim_dur = 1000; // duration of the whole animation in milliseconds
+		main.anim_state.flip_dur = 1.0; // fraction of a frame that the flip animation should take
 		main.anim_state.frame_step = move.quant / main.anim_state.frame_total;
 		move.frame_step = main.anim_state.frame_step;
 		main.anim_state.frame_dur = main.anim_state.anim_dur / main.anim_state.frame_total;
@@ -577,9 +579,7 @@ var Rays = (function() {
 		main.anim_state.start_time = performance.now();
 		main.anim_state.time_tick = function() {
 			var elapsed = performance.now() - this.start_time;
-			//console.log("elapsed: ", elapsed);
 			var fract = elapsed / (this.frame_dur * this.flip_dur);
-			//console.log("fract: ", fract);
 			fract = fract > 1.0 ? 1.0 : fract; // animation is finished if greater than 1
 			return fract;
 		};
@@ -964,7 +964,7 @@ var Rays = (function() {
 			}
 			// ! val to trigger on keyup
 			else if (main.move_mode === "step" && ! val && ! main.anim_state) {
-				main.player.move_step({move_type: "step", quant: 1.0});
+				main.player.move_step({move_type: "step", quant: 2.0});
 			}
 		}
 		else if (e.code === "KeyS" || e.key === "s" || e.key === "S") {
@@ -973,7 +973,7 @@ var Rays = (function() {
 			}
 			// ! val to trigger on keyup
 			else if (main.move_mode === "step" && ! val && ! main.anim_state) {
-				main.player.move_step({move_type: "step", quant: -1.0});
+				main.player.move_step({move_type: "step", quant: -2.0});
 			}
 		}
 		else if (e.code === "KeyA" || e.key === "a" || e.key === "A") {
@@ -1341,7 +1341,6 @@ var Rays = (function() {
 			}
 			
 			if (main.pixi_stage.filters && main.pixi_stage.filters.length) {
-				//main.pixi_stage.filters[0].uniforms.time = performance.now() / 2000.0;
 				if (main.anim_state) {
 					main.pixi_stage.filters[0].uniforms.time = main.anim_state.time_tick();
 				}

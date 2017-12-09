@@ -16,6 +16,56 @@
 	<!--
 	TEST TEST TEST
 	-->
+	<script id = "simple_test" type = "shader">
+		varying vec2 vTextureCoord;
+		uniform vec4 filterArea;
+		uniform vec2 dimensions;
+		uniform sampler2D uSampler;
+		uniform float time;
+		
+		vec2 mapCoord( vec2 coord ) {
+			coord *= filterArea.xy;
+			coord += filterArea.zw;
+
+			return coord;
+		}
+
+		vec2 unmapCoord( vec2 coord ) {
+			coord -= filterArea.zw;
+			coord /= filterArea.xy;
+
+			return coord;
+		}
+		
+		bool almost_eq(float num1, float num2, float range) {
+			return (abs(num1 - num2) <= range);
+		}
+		
+		void main(void) {
+			vec2 coord = mapCoord(vTextureCoord) / dimensions;
+			//coord = unmapCoord(coord);
+			
+			
+			
+			// 1 pixel's worth of .y
+			float range = 1.0 / dimensions.y;
+			float indicator = 0.0;
+			if (almost_eq(coord.y, time, range)) {
+				indicator = 1.0;
+			}
+			
+			// interval after time when something else should happen
+			float interval = 0.2;
+			float after_indicator = 0.0;
+			if (almost_eq(coord.y, time - interval, range)) {
+				after_indicator = 1.0;
+			}
+			
+			vec4 color = texture2D(uSampler, coord);
+			gl_FragColor = vec4(color.r, indicator, after_indicator, 1.0);
+		}
+	</script>
+	
 	<script id = "compare_test" type = "shader">
 		varying vec2 vTextureCoord;
 		uniform sampler2D last_frame;
@@ -44,22 +94,6 @@
 			vec2 coord = ((vTextureCoord * filterArea.xy) + filterArea.zw) / other_dim;
 			gl_FragColor = texture2D(last_frame, coord);
 			
-			
-			/*
-			vec2 coord = mapCoord(vTextureCoord) / dimensions;
-			vec2 screen = mapCoord(coord);
-			screen += 4.0;
-			
-			float thing = 0.0;
-			if (screen.y > 0.0) {
-				thing = 1.0;
-			}
-			
-			vec2 color_getter = unmapCoord(screen);
-			
-			vec4 out_color = texture2D(last_frame, color_getter);
-			gl_FragColor = vec4(out_color.r, out_color.g, out_color.b, 1.0);
-			*/
 		}
 		
 	</script>
@@ -76,6 +110,7 @@
 		uniform float tile_tex_ratio_x;
 		uniform float tile_tex_ratio_y;
 		uniform vec2 dimensions;
+		uniform vec2 canvas_size;
 		uniform vec4 filterArea;
 		uniform float px_tile_width;
 		uniform float time;
@@ -95,6 +130,10 @@
 			return coord;
 		}
 		
+		bool almost_eq(float num1, float num2, float range) {
+			return (abs(num1 - num2) <= range);
+		}
+		
 		void main(void){
 			// get screen/px coord
 			vec2 screen = mapCoord(vTextureCoord);
@@ -109,12 +148,10 @@
 			vec2 sq_coord = unmapCoord(px_square_coord);
 			vec4 sq_color = texture2D(uSampler, sq_coord);
 			
-			// the color we'll use for further calculations
-			//vec4 use_color = sq_color;
-			// indicator
+			// pseudo-frame difference indicator
 			float indicator = 0.0;
 			
-			// now get the square color of the next frame
+			// now get the square color of the next pseudo-frame
 			vec2 last_frame_dim = vec2(1024.0, 768.0);
 			vec2 next_sq_coord = ((sq_coord * filterArea.xy) + filterArea.zw) / last_frame_dim; // works!
 			vec4 last_sq_color = texture2D(last_frame, next_sq_coord);
@@ -127,7 +164,7 @@
 			
 			// get the difference between the square colors
 			vec4 color_diff = abs(sq_color - last_sq_color);
-			
+			// if this pseudo-frame's tile should be different than the last, set indicator
 			if (color_diff.r > 0.1) {
 				indicator = 1.0;
 			}
@@ -143,34 +180,33 @@
 			vec4 cur_frame_color;
 			vec4 last_frame_color;
 			
-			//if (indicator == 0.0) {
-				if (sq_color.r < 0.1) {
-					cur_frame_color = tile_tex0_color;
-				}
-				else if (sq_color.r < 0.2) {
-					cur_frame_color = tile_tex1_color;
-				}
-				else if (sq_color.r < 0.4) {
-					cur_frame_color = tile_tex2_color;
-				}
-				else {
-					cur_frame_color = tile_tex3_color;
-				}
-			//}
-			//else if (indicator == 1.0) {
-				if (last_sq_color.r < 0.1) {
-					last_frame_color = tile_tex0_color;
-				}
-				else if (last_sq_color.r < 0.2) {
-					last_frame_color = tile_tex1_color;
-				}
-				else if (last_sq_color.r < 0.4) {
-					last_frame_color = tile_tex2_color;
-				}
-				else {
-					last_frame_color = tile_tex3_color;
-				}
-			//}
+			// set the current frame's tile color
+			if (sq_color.r < 0.1) {
+				cur_frame_color = tile_tex0_color;
+			}
+			else if (sq_color.r < 0.2) {
+				cur_frame_color = tile_tex1_color;
+			}
+			else if (sq_color.r < 0.4) {
+				cur_frame_color = tile_tex2_color;
+			}
+			else {
+				cur_frame_color = tile_tex3_color;
+			}
+			
+			// now the last frame's tile color
+			if (last_sq_color.r < 0.1) {
+				last_frame_color = tile_tex0_color;
+			}
+			else if (last_sq_color.r < 0.2) {
+				last_frame_color = tile_tex1_color;
+			}
+			else if (last_sq_color.r < 0.4) {
+				last_frame_color = tile_tex2_color;
+			}
+			else {
+				last_frame_color = tile_tex3_color;
+			}
 			
 			// pick which color we're using based on diff indicator
 			if (indicator == 1.0) {
@@ -180,17 +216,13 @@
 				out_color = cur_frame_color;
 			}
 			
-			// prep for flip
-			float flip_factor = 1.0;
-			float flip_neg = 1.0; // this guy negates flip_factor when flip condition does not apply
-			//if (sq_color.r > 0.1) {
-			if (indicator == 1.0) {
-				//flip_factor = abs(sin(time));
-				flip_factor = time;//fract(time);
-			}
-			else {
-				flip_neg = 0.0;
-			}
+			
+			// screen percent between 0 and 1 for scanline
+			float screen_y_pct = (mapCoord(vTextureCoord) / dimensions).y;
+			// duration of flip animation in percent screen height
+			float flip_dur = 0.2;
+			// flip_p is progress of flip between 0 and 1
+			float flip_p = clamp((time - screen_y_pct) / flip_dur, 0.0, 1.0);
 			
 			// get border
 			float modx = 0.0;
@@ -198,17 +230,18 @@
 			float bordx = step(1.0, modx);
 			float mody = 0.0;
 			mody = floor(mod(screen.y, px_tile_width));
-			float bordy = step(1.0, mody - (flip_factor * px_tile_width * flip_neg)); // flip is here
+			float height_in_tile = (mody / px_tile_width);
+			float bordy = step(1.0, mody);
+			float flipped = step(flip_p, height_in_tile);
 			float border = bordx * bordy;
 			
-			// sets flip color
-			if (mody > 0.01 && modx > 0.01 && border < 0.01) {
+			// sets flip color if border was set to vec2(0,0) but we're not actually on a border
+			if (mody > 0.01 && modx > 0.01 && flipped < 0.01) {
 				border = 1.0;
 				out_color = cur_frame_color;
 			}
 			
 			gl_FragColor = vec4(out_color.r * border , out_color.g * border, out_color.b * border, 1.0);
-			//gl_FragColor = vec4(0.0, fr[0], 0.0, 1.0);
 		}
 	</script>
 	
