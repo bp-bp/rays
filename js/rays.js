@@ -360,7 +360,7 @@ var Rays = (function() {
 			PIXI.SCALE_MODES.DEFAULT =1;// PIXI.SCALE_MODES.NEAREST;
 			console.log(PIXI.settings);
 			// shader
-			var shader_code = document.getElementById("shader").innerHTML;
+			var shader_code = document.getElementById("simple_test").innerHTML;
 			main.shader = new PIXI.Filter("", shader_code);
 			main.shader.uniforms.time = 0.0;
 			main.shader.uniforms.screen_width = main.canvas.width;
@@ -371,10 +371,6 @@ var Rays = (function() {
 			main.shader.apply = function(filterManager, input, output) {
 				this.uniforms.dimensions[0] = input.sourceFrame.width;
 				this.uniforms.dimensions[1] = input.sourceFrame.height;
-				
-				//console.log("dimensions: ", this.uniforms.dimensions);
-				//console.log("filterManager: ", filterManager);
-				//console.log("input; ", input);
 				
 				filterManager.applyFilter(this, input, output);
 			};
@@ -1344,7 +1340,12 @@ var Rays = (function() {
 				if (main.anim_state) {
 					main.pixi_stage.filters[0].uniforms.time = main.anim_state.time_tick();
 				}
+				// TEST TEST TEST
+				main.pixi_stage.filters[0].uniforms.time = performance.now() / 3000.0;//(performance.now() / 1000.0) % 1.0;
 			}
+			
+			
+			
 			main.pixi_renderer.render(main.pixi_stage);
 		}
 		
