@@ -199,8 +199,6 @@
 		uniform sampler2D tile_tex2;
 		uniform sampler2D tile_tex3;
 		uniform sampler2D last_frame;
-		uniform float tile_tex_ratio_x;
-		uniform float tile_tex_ratio_y;
 		uniform vec2 dimensions;
 		uniform vec2 canvas_size;
 		uniform vec2 unif_last_frame_dim;
@@ -230,7 +228,7 @@
 		float get_flip(vec2 fr, float prog) {
 			// some constants
 			float width = 0.5;
-			float round = 0.8;
+			float round = 0.5; // was 0.8
 			float pi = 3.1415927;
 			
 			// begin
@@ -282,11 +280,13 @@
 			}
 			
 			// get the various tile colors
-			vec2 tile_tex_ratio = vec2(tile_tex_ratio_x, tile_tex_ratio_y);
-			vec4 tile_tex0_color = texture2D(tile_tex0, vTextureCoord * tile_tex_ratio);
-			vec4 tile_tex1_color = texture2D(tile_tex1, vTextureCoord * tile_tex_ratio);
-			vec4 tile_tex2_color = texture2D(tile_tex2, vTextureCoord * tile_tex_ratio);
-			vec4 tile_tex3_color = texture2D(tile_tex3, vTextureCoord * tile_tex_ratio);
+			vec2 tile_dim = vec2(256.0, 256.0);
+			vec2 tile_coord = ((vTextureCoord * filterArea.xy) + filterArea.zw) / tile_dim; // this works too
+			
+			vec4 tile_tex0_color = texture2D(tile_tex0, tile_coord);
+			vec4 tile_tex1_color = texture2D(tile_tex1, tile_coord);
+			vec4 tile_tex2_color = texture2D(tile_tex2, tile_coord);
+			vec4 tile_tex3_color = texture2D(tile_tex3, tile_coord);
 			
 			vec4 out_color;
 			vec4 cur_frame_color;
@@ -329,7 +329,7 @@
 			}
 			
 			// adds some randomness to the flip phase
-			float flip_phase_offset = texture2D(tile_tex1, sq_coord * tile_tex_ratio).r;
+			float flip_phase_offset = texture2D(tile_tex1, sq_coord).r;
 			
 			// screen percent between 0 and 1 for scanline
 			float screen_y_pct = (mapCoord(vTextureCoord) / dimensions).y;
@@ -337,7 +337,7 @@
 			float flip_dur = 0.5;
 			// flip_p is progress of flip between 0 and 1
 			float flip_p;
-			// flip_p = clamp((time - screen_y_pct) / flip_dur, 0.0, 1.0); // use for scanline effect
+			//flip_p = clamp((time - screen_y_pct) / flip_dur, 0.0, 1.0); // use for scanline effect
 			flip_p = time + flip_phase_offset; // use to flip all tiles at once, no scanline
 			
 			if (indicator == 0.0) {
@@ -382,8 +382,6 @@
 		uniform sampler2D tile_tex1;
 		uniform sampler2D tile_tex2;
 		uniform sampler2D tile_tex3;
-		uniform float tile_tex_ratio_x;
-		uniform float tile_tex_ratio_y;
 		uniform vec2 dimensions;
 		uniform vec4 filterArea;
 		uniform float px_tile_width;
@@ -406,7 +404,7 @@
 		float get_flip(vec2 fr, float prog) {
 			// some constants
 			float width = 0.5;
-			float round = 0.8;
+			float round = 0.5;
 			float pi = 3.1415927;
 			
 			// begin
@@ -426,9 +424,6 @@
 			// get screen/px coord
 			vec2 screen = mapCoord(vTextureCoord);
 			
-			// TEST
-			//vec2 coord = mapCoord(vTextureCoord) / dimensions;
-			//vec2 screen = mapCoord(coord);
 			
 			// get px square coord
 			vec2 raw = vec2((screen.x / px_tile_width), (screen.y / px_tile_width));
@@ -445,12 +440,14 @@
 			float num_colors = 6.0;
 			sq_color = floor(sq_color * num_colors) / num_colors;
 			
-			// get the various 
-			vec2 tile_tex_ratio = vec2(tile_tex_ratio_x, tile_tex_ratio_y);
-			vec4 tile_tex0_color = texture2D(tile_tex0, vTextureCoord * tile_tex_ratio);
-			vec4 tile_tex1_color = texture2D(tile_tex1, vTextureCoord * tile_tex_ratio);
-			vec4 tile_tex2_color = texture2D(tile_tex2, vTextureCoord * tile_tex_ratio);
-			vec4 tile_tex3_color = texture2D(tile_tex3, vTextureCoord * tile_tex_ratio);
+			// get the various tile colors
+			vec2 tile_dim = vec2(256.0, 256.0);
+			vec2 tile_coord = ((vTextureCoord * filterArea.xy) + filterArea.zw) / tile_dim; // this works too
+			
+			vec4 tile_tex0_color = texture2D(tile_tex0, tile_coord);
+			vec4 tile_tex1_color = texture2D(tile_tex1, tile_coord);
+			vec4 tile_tex2_color = texture2D(tile_tex2, tile_coord);
+			vec4 tile_tex3_color = texture2D(tile_tex3, tile_coord);
 			
 			vec4 out_color;
 			if (sq_color.r < 0.1) {

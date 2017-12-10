@@ -439,14 +439,14 @@ var Rays = (function() {
 				main.shader.uniforms.tile_tex3 = tile_tex3;
 				main.step_trans_shader.uniforms.tile_tex3 = tile_tex3;
 				
-				main.shader.uniforms.tile_tex_ratio_x = (main.canvas.width / 256.0) * 1.4142;// * 2.0; // sqrt two???
-				main.shader.uniforms.tile_tex_ratio_y = (main.canvas.height / 256.0) * 1.4142;// * 2.0;
-				main.shader.uniforms.tile_width = (main.column_width / main.canvas.width) / 2.0;
+				main.shader.uniforms.tile_tex_ratio_x = (main.canvas.width / tile_tex0.width) * (main.canvas.width / main.canvas.height);// * 2.0; // sqrt two???
+				main.shader.uniforms.tile_tex_ratio_y = (main.canvas.height / tile_tex0.height) * (main.canvas.width / main.canvas.height);// * 2.0;
+				//main.shader.uniforms.tile_width = (main.column_width / main.canvas.width) / 2.0;
 				main.shader.uniforms.px_tile_width = main.column_width;
 				main.shader.uniforms.tile_height = (main.column_width / main.canvas.height) / 2.0;
 				
-				main.step_trans_shader.uniforms.tile_tex_ratio_x = (main.canvas.width / 256.0) * 1.4142;// * 2.0;
-				main.step_trans_shader.uniforms.tile_tex_ratio_y = (main.canvas.height / 256.0) * 1.4142;// * 2.0;
+				main.step_trans_shader.uniforms.tile_tex_ratio_x = (main.canvas.width / tile_tex0.width) * Math.sqrt(2.0);// * 2.0;
+				main.step_trans_shader.uniforms.tile_tex_ratio_y = (main.canvas.height / tile_tex0.width) * Math.sqrt(2.0);// * 2.0;
 				main.step_trans_shader.uniforms.tile_width = (main.column_width / main.canvas.width) / 2.0;
 				main.step_trans_shader.uniforms.px_tile_width = main.column_width;
 				main.step_trans_shader.uniforms.tile_height = (main.column_width / main.canvas.height) / 2.0;
@@ -987,7 +987,7 @@ var Rays = (function() {
 			}
 			// ! val to trigger on keyup
 			else if (main.move_mode === "step" && ! val) {
-				main.player.enqueue_step({move_type: "step", quant: 2.0});
+				main.player.enqueue_step({move_type: "step", quant: 1.0});
 			}
 		}
 		else if (e.code === "KeyS" || e.key === "s" || e.key === "S") {
@@ -996,7 +996,7 @@ var Rays = (function() {
 			}
 			// ! val to trigger on keyup
 			else if (main.move_mode === "step" && ! val) {
-				main.player.enqueue_step({move_type: "step", quant: -2.0});
+				main.player.enqueue_step({move_type: "step", quant: -1.0});
 			}
 		}
 		else if (e.code === "KeyA" || e.key === "a" || e.key === "A") {

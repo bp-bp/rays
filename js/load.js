@@ -15,7 +15,7 @@ window.addEventListener("load", function() {
 								, max_view_dist: 20.0
 								, column_width: 6.0
 								, move_speed: 10.0
-								, move_anim_duration: 1000.0
+								, move_anim_duration: 500.0
 								, move_anim_psuedo_frame_count: 1.0
 								, move_mode: "step"
 								, fps_field: fps_field
