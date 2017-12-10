@@ -17,6 +17,99 @@
 	TEST TEST TEST
 	-->
 	
+	<script id = "size_based" type = "shader">
+		varying vec2 vTextureCoord;
+		
+		uniform sampler2D uSampler;
+		uniform vec2 dimensions;
+		uniform vec2 canvas_size;
+		uniform vec4 filterArea;
+		uniform float px_tile_width;
+		uniform float time;
+		
+		vec2 mapCoord( vec2 coord ) {
+			coord *= filterArea.xy;
+			coord += filterArea.zw;
+
+			return coord;
+		}
+
+		vec2 unmapCoord( vec2 coord ) {
+			coord -= filterArea.zw;
+			coord /= filterArea.xy;
+
+			return coord;
+		}
+		
+		bool almost_eq(float num1, float num2, float range) {
+			return (abs(num1 - num2) <= range);
+		}
+		
+		float get_flip(vec2 fr, float prog, float col) {
+			// some constants
+			float width = 0.5;
+			float round = 1.0;
+			float pi = 3.1415927;
+			
+			round = col;
+			
+			// begin
+			vec2 uv = vec2(2.0 * fr - 1.0);
+			vec3 r = vec3(uv, 3.0);
+			vec3 n = vec3(0.0, sin(prog * pi), cos(prog * pi));
+			float t = (r.z * n.z)/dot(n, r);
+			vec3 p = r * t;
+			vec2 q = vec2(p.x, p.y/n.z);
+			float flipped = round - length(q - clamp(q, -width, width));
+			
+			return flipped;
+		}
+		
+		
+		void main(void){
+			// get screen/px coord
+			vec2 screen = mapCoord(vTextureCoord);
+			
+			// get px square coord
+			vec2 raw = vec2((screen.x / px_tile_width), (screen.y / px_tile_width));
+			vec2 fr = fract(raw);
+			vec2 px_square_coord = vec2(floor(raw.x) * px_tile_width, floor(raw.y) * px_tile_width);
+			px_square_coord += 0.5; // prevents bleeding
+			
+			// put it back as a texture coord and get the square color
+			vec2 orig = unmapCoord(screen);
+			vec2 sq_coord = unmapCoord(px_square_coord);
+			vec4 sq_color = texture2D(uSampler, sq_coord);
+			
+			vec4 out_color = sq_color;
+			
+			// screen percent between 0 and 1 for scanline
+			float screen_y_pct = (mapCoord(vTextureCoord) / dimensions).y;
+			// duration of flip animation in percent screen height
+			float flip_dur = 0.2;
+			// flip_p is progress of flip between 0 and 1
+			float flip_p = clamp((time - screen_y_pct) / flip_dur, 0.0, 1.0);
+			
+			// get border
+			float modx = 0.0;
+			modx = floor(mod(screen.x, px_tile_width));
+			float bordx = step(1.0, modx);
+			float mody = 0.0;
+			mody = floor(mod(screen.y, px_tile_width));
+			float bordy = step(1.0, mody);
+			
+			// call flip here
+			float flipped = get_flip(fr, flip_p, out_color.r);
+			
+			float border = bordx * bordy;
+			
+			//flipped = clamp(flipped, 0.5, 1.0);
+			out_color = vec4(flipped, flipped, flipped, 1.0);
+			
+			gl_FragColor = vec4(out_color.r, out_color.g, out_color.b, 1.0);
+		}
+	</script>
+	
 	<script id = "simple_test" type = "shader">
 		varying vec2 vTextureCoord;
 		

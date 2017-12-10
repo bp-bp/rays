@@ -367,7 +367,7 @@ var Rays = (function() {
 			PIXI.SCALE_MODES.DEFAULT =1;// PIXI.SCALE_MODES.NEAREST;
 			console.log(PIXI.settings);
 			// shader
-			var shader_code = document.getElementById("shader").innerHTML;
+			var shader_code = document.getElementById("size_based").innerHTML;
 			main.shader = new PIXI.Filter("", shader_code);
 			main.shader.uniforms.time = 0.0;
 			main.shader.uniforms.screen_width = main.canvas.width;
@@ -383,7 +383,7 @@ var Rays = (function() {
 			};
 			
 			// step transition shader
-			var trans_shader_code = document.getElementById("step_trans_shader").innerHTML;
+			var trans_shader_code = document.getElementById("size_based").innerHTML;
 			main.step_trans_shader = new PIXI.Filter("", trans_shader_code);
 			main.step_trans_shader.uniforms.time = 0.0;
 			main.step_trans_shader.uniforms.canvas_size = {type: "v2", value: [main.canvas.width, main.canvas.height]};
@@ -407,15 +407,15 @@ var Rays = (function() {
 			// get our tile textures
 			// these should go in an atlas
 			var loader = new PIXI.loaders.Loader();
-			//loader.add("tile_tex0", "textures/wood_tiles/black_wood.jpg");
-			//loader.add("tile_tex1", "textures/wood_tiles/dark_wood.jpg");
-			//loader.add("tile_tex2", "textures/wood_tiles/medium_wood.jpg");
-			//loader.add("tile_tex3", "textures/wood_tiles/light_wood.jpg");
+			loader.add("tile_tex0", "textures/wood_tiles/black_wood.jpg");
+			loader.add("tile_tex1", "textures/wood_tiles/dark_wood.jpg");
+			loader.add("tile_tex2", "textures/wood_tiles/medium_wood.jpg");
+			loader.add("tile_tex3", "textures/wood_tiles/light_wood.jpg");
 			
-			loader.add("tile_tex0", "textures/marble_tiles/0_good.jpg");
-			loader.add("tile_tex1", "textures/marble_tiles/1_good.jpg");
-			loader.add("tile_tex2", "textures/marble_tiles/2_good.jpg");
-			loader.add("tile_tex3", "textures/marble_tiles/3_good.jpg");
+			//loader.add("tile_tex0", "textures/marble_tiles/0_good.jpg");
+			//loader.add("tile_tex1", "textures/marble_tiles/1_good.jpg");
+			//loader.add("tile_tex2", "textures/marble_tiles/2_good.jpg");
+			//loader.add("tile_tex3", "textures/marble_tiles/3_good.jpg");
 			
 			loader.load(function(loader, resources) {
 				// once loaded, give them to the tile shader
@@ -1476,7 +1476,7 @@ var Rays = (function() {
 					main.wall_tex_slice_width = Math.round(main.wall_tex.width * (main.column_width / main.canvas.width)) || 1;
 					if (main.renderer === "pixi") {
 						main.base_wall_tex_pixi = new PIXI.BaseTexture(main.wall_tex);
-						main.base_wall_tex_pixi.mipmap = false;
+						//main.base_wall_tex_pixi.mipmap = false;
 						main.base_wall_tex_pixi.scaleMode = PIXI.SCALE_MODES.NEAREST;
 						main.wall_tex_pixi = new PIXI.Texture(main.base_wall_tex_pixi);
 						
@@ -1486,8 +1486,6 @@ var Rays = (function() {
 						for (c = 0; c < main.num_columns; c++) {
 							slice_tex = new PIXI.Texture(main.base_wall_tex_pixi);
 							slice_tex.scaleMode = PIXI.SCALE_MODES.NEAREST;
-							// set frame in draw_batched_view_rects_tex_pixi, not here
-							//slice_tex.frame = new PIXI.Rectangle(c * main.column_width, 0, main.column_width, main.wall_tex_pixi.height);
 							col_sprite = new PIXI.Sprite(slice_tex);
 							col_sprite.scaleMode = PIXI.SCALE_MODES.NEAREST;
 							col_sprite.x = (c * main.column_width);
@@ -1495,12 +1493,6 @@ var Rays = (function() {
 						}
 						
 						main.wall_tex_pixi.frame = new PIXI.Rectangle(0, 0, 25, main.wall_tex.height);
-						//console.log(main.wall_tex_pixi.width);
-						//console.log(main.wall_tex.orig);
-						
-						//var sprite = new PIXI.Sprite(main.wall_tex_pixi);
-						//main.pixi_stage.addChild(sprite);
-						//main.pixi_renderer.render(main.pixi_stage);
 					}
 					resolve(main.wall_tex); // maybe just "true", who cares
 				};
