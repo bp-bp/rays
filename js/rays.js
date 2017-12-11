@@ -367,7 +367,7 @@ var Rays = (function() {
 			PIXI.SCALE_MODES.DEFAULT =1;// PIXI.SCALE_MODES.NEAREST;
 			console.log(PIXI.settings);
 			// shader
-			var shader_code = document.getElementById("size_based").innerHTML;
+			var shader_code = document.getElementById("shader").innerHTML;
 			main.shader = new PIXI.Filter("", shader_code);
 			main.shader.uniforms.time = 0.0;
 			main.shader.uniforms.screen_width = main.canvas.width;
@@ -383,7 +383,7 @@ var Rays = (function() {
 			};
 			
 			// step transition shader
-			var trans_shader_code = document.getElementById("size_based").innerHTML;
+			var trans_shader_code = document.getElementById("step_trans_shader").innerHTML;
 			main.step_trans_shader = new PIXI.Filter("", trans_shader_code);
 			main.step_trans_shader.uniforms.time = 0.0;
 			main.step_trans_shader.uniforms.canvas_size = {type: "v2", value: [main.canvas.width, main.canvas.height]};
@@ -1117,14 +1117,13 @@ var Rays = (function() {
 		ret.square_pt = new main.Pt({x: lookup_x, y: lookup_y});
 		
 		// let's get our texture offset here too... a little wasteful
-		// also sometimes incorrect when looking in a negative direction...
-		var modx = x % 1.0, mody = y % 1.0;
+		/*var modx = x % 1.0, mody = y % 1.0;
 		if (modx === 0) {
 			ret.tex_offset = mody;
 		}
 		else {
 			ret.tex_offset = modx;
-		}
+		}*/
 		
 		return ret;
 	};
@@ -1170,14 +1169,14 @@ var Rays = (function() {
 		var dist, stop = false, cnt = 0;
 
 		var cos, sin;
-		if (main.cos_calls[ang] != undefined) {
+		if (main.cos_calls[ang] !== undefined) {
 			cos = main.cos_calls[ang];
 		}
 		else {
 			cos = Math.cos(ang);
 			main.cos_calls[ang] = cos;
 		}
-		if (main.sin_calls[ang] != undefined) {
+		if (main.sin_calls[ang] !== undefined) {
 			sin = main.sin_calls[ang];
 		}
 		else {
@@ -1198,6 +1197,17 @@ var Rays = (function() {
 
 		cur.x = temp_pt.x;
 		cur.y = temp_pt.y;
+		// get our texture offset
+		var modx = cur.x % 1.0, mody = cur.y % 1.0;
+		cur.tex_offset = (modx === 0) ? mody : modx;
+		/*
+		if (modx === 0) {
+			cur.tex_offset = mody;
+		}
+		else {
+			cur.tex_offset = modx;
+		}*/
+		
 		grid_points.push(new main.Pt({x: cur.x, y: cur.y}));
 		cur.grid_points = grid_points;
 		
