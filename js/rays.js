@@ -7,12 +7,21 @@ else { // otherwise assume these modules are loaded globally
 }
 
 var Rays = (function() {
+	this.something = 4;
 	function Main(init) {
 		var main = this;
+		main.num_pts = 0;
+		
+		var test_pt = Pt({x: 3, y: 9});
+		var other_pt = Pt({x: 1, y: -1000});
+		console.log(test_pt);
+		console.log(other_pt);
+		
 		
 		// Pt -- simple x,y container
 		main.Pt = function(init) {
 			var pt = this;
+			main.num_pts += 1;
 
 			pt.check_params(init);
 
@@ -287,6 +296,8 @@ var Rays = (function() {
 	
 	Main.prototype.init = function(init) {
 		var main = this;
+
+		main.num_pts = 0;
 		
 		// handle init options
 		main.canvas = init.canvas || null;
@@ -1137,6 +1148,13 @@ var Rays = (function() {
 		return dist;
 	};
 	
+	// same as above using number arguments for performance-heavy uses
+	Main.prototype.get_dist_nums = function(x1, y1, x2, y2) {
+		var x_diff = Math.abs(x1 - x2);
+		var y_diff = Math.abs(y1 - y2);
+		return Math.sqrt(x_diff * x_diff + y_diff * y_diff);
+	};
+	
 	// casts rays and gets the contents of our view columns
 	Main.prototype.get_columns = function() {
 		var main = this;
@@ -1188,7 +1206,7 @@ var Rays = (function() {
 			temp_pt = main.next_grid(cos, sin, temp_pt.x, temp_pt.y);
 			grid_points.push(temp_pt);
 			cur = main.get_square(temp_pt.x, temp_pt.y, cos, sin);
-			dist = dist = main.get_dist(main.player.loc, temp_pt);
+			dist = main.get_dist(main.player.loc, temp_pt);
 			cur.dist = dist;
 			if (dist > main.max_view_dist) {
 				stop = true;
@@ -1197,16 +1215,10 @@ var Rays = (function() {
 
 		cur.x = temp_pt.x;
 		cur.y = temp_pt.y;
+		
 		// get our texture offset
 		var modx = cur.x % 1.0, mody = cur.y % 1.0;
 		cur.tex_offset = (modx === 0) ? mody : modx;
-		/*
-		if (modx === 0) {
-			cur.tex_offset = mody;
-		}
-		else {
-			cur.tex_offset = modx;
-		}*/
 		
 		grid_points.push(new main.Pt({x: cur.x, y: cur.y}));
 		cur.grid_points = grid_points;
@@ -1252,13 +1264,18 @@ var Rays = (function() {
 		temp_x = temp_y * (run/rise);
 		whole_y = temp_y + y;
 		whole_y_x = temp_x + x;
-
+		
+		// took out unnecessary Pt creation
+		/*
 		var whole_x_pt = new main.Pt({x: whole_x, y: whole_x_y});
 		var whole_y_pt = new main.Pt({x: whole_y_x, y: whole_y});
 
 		var init_pt = new main.Pt({x: x, y: y});
 		var whole_x_dist = main.get_dist(init_pt, whole_x_pt);
 		var whole_y_dist = main.get_dist(init_pt, whole_y_pt);
+		*/
+		var whole_x_dist = main.get_dist_nums(x, y, whole_x, whole_x_y);
+		var whole_y_dist = main.get_dist_nums(x, y, whole_y_x, whole_y);
 
 		var ret = whole_x_dist <= whole_y_dist ? new main.Pt({x: whole_x, y: whole_x_y}) : new main.Pt({x: whole_y_x, y: whole_y});
 

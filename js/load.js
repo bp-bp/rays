@@ -11,8 +11,10 @@ window.addEventListener("load", function() {
 								, use_minimap: true
 								, map_file_name: "map.png"
 								//, wall_tex_file_name: "wall_tex2.png"
-								, wall_tex_file_name: "stone_wall_cartoon.png"
-								, renderer: "pixi" // options are "vanilla" and "pixi"
+								//, wall_tex_file_name: "stone_wall_cartoon.png"
+								//, wall_tex_file_name: "marble-wall.jpg"
+								, wall_tex_file_name: "gray-marble.png"
+								, renderer: "vanilla" // options are "vanilla" and "pixi"
 								, max_view_dist: 20.0
 								, column_width: 2.0
 								, move_speed: 10.0
