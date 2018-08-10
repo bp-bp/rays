@@ -12,10 +12,10 @@ var Rays = (function() {
 		var main = this;
 		main.num_pts = 0;
 		
-		var test_pt = Pt({x: 3, y: 9});
-		var other_pt = Pt({x: 1, y: -1000});
-		console.log(test_pt);
-		console.log(other_pt);
+		//var test_pt = Pt({x: 3, y: 9});
+		//var other_pt = Pt({x: 1, y: -1000});
+		//console.log(test_pt);
+		//console.log(other_pt);
 		
 		
 		// Pt -- simple x,y container
@@ -90,7 +90,7 @@ var Rays = (function() {
 			rect.height = null;
 
 			// could init with a point then width, height
-			if (init.pt && (init.pt instanceof main.Pt)) {
+			if (init.pt) {// && (init.pt instanceof main.Pt)) {
 				rect.x = init.pt.x;
 				rect.y = init.pt.y;
 			}
@@ -100,6 +100,7 @@ var Rays = (function() {
 				rect.y = init.y;
 			}
 			else {
+				console.log('init: ', init);
 				throw new Error("problem in Rect init: x, y, or pt are not present or invalid.");
 			}
 			// now width,height
@@ -151,7 +152,7 @@ var Rays = (function() {
 				}
 			}
 
-			return new main.Pt({x: rect.x, y: rect.y});
+			return Pt({x: rect.x, y: rect.y});
 		};
 
 		// the player
@@ -224,7 +225,7 @@ var Rays = (function() {
 			//console.log(move)
 			
 			if (move.move_type === "step") {
-				var move_vec = new main.Pt({x: Math.cos(play.dir), y: Math.sin(play.dir)});
+				var move_vec = Pt({x: Math.cos(play.dir), y: Math.sin(play.dir)});
 				move_vec.mul(move.frame_step);
 				play.loc.x += move_vec.x;
 				play.loc.y += move_vec.y;
@@ -247,7 +248,7 @@ var Rays = (function() {
 			}
 
 			if (main.move_state.forward || main.move_state.backward) {
-				var move_vec = new main.Pt({x: Math.cos(play.dir), y: Math.sin(play.dir)});
+				var move_vec = Pt({x: Math.cos(play.dir), y: Math.sin(play.dir)});
 				move_vec.mul(main.move_speed * (main.dt() / 1000.0));
 
 				if (main.move_state.forward) {
@@ -565,7 +566,7 @@ var Rays = (function() {
 		main.paused = false;
 		main.blur_paused = false;
 		main.step_queue = [];
-		main.player = new main.Player({loc: new main.Pt({x: 5.0, y: 3.0}), dir: Math.PI * 0.5});
+		main.player = new main.Player({loc: Pt.create_persist({x: 5.0, y: 3.0}), dir: Math.PI * 0.5});
 		main.draw_mode = "solid"; // options are "solid", "edges", or "texture"
 	};
 
@@ -724,13 +725,13 @@ var Rays = (function() {
 		
 		var sq_key = col.square_pt.toString();
 		if (main.view_batched_edges[sq_key]) {
-			main.view_batched_edges[sq_key].tops.push(new main.Pt({x: rc.left(), y: rc.top()}));
-			main.view_batched_edges[sq_key].bottoms.push(new main.Pt({x: rc.left(), y: rc.bottom()}));
+			main.view_batched_edges[sq_key].tops.push(Pt({x: rc.left(), y: rc.top()}));
+			main.view_batched_edges[sq_key].bottoms.push(Pt({x: rc.left(), y: rc.bottom()}));
 		}
 		else {
 			main.view_batched_edges[sq_key] = {tops: [], bottoms: []};
-			main.view_batched_edges[sq_key].tops.push(new main.Pt({x: rc.left(), y: rc.top()}));
-			main.view_batched_edges[sq_key].bottoms.push(new main.Pt({x: rc.left(), y: rc.bottom()}));
+			main.view_batched_edges[sq_key].tops.push(Pt({x: rc.left(), y: rc.top()}));
+			main.view_batched_edges[sq_key].bottoms.push(Pt({x: rc.left(), y: rc.bottom()}));
 		}
 	}
 	
@@ -742,7 +743,7 @@ var Rays = (function() {
 			main.view_ctx.strokeStyle = "white";
 			
 			// first tops
-			var first_pt = new main.Pt({x: main.view_batched_edges[sq_key].tops[0].x, y: main.view_batched_edges[sq_key].tops[0].y});
+			var first_pt = Pt({x: main.view_batched_edges[sq_key].tops[0].x, y: main.view_batched_edges[sq_key].tops[0].y});
 			main.view_ctx.beginPath();
 			main.view_ctx.moveTo(first_pt.x, first_pt.y);
 			var i;
@@ -865,7 +866,7 @@ var Rays = (function() {
 			main.minimap_batched_rects[color] = [];
 		}
 
-		var draw_pt = new main.Pt({x: pt.x * main.map_res_factor_x, y: pt.y * main.map_res_factor_y});
+		var draw_pt = Pt({x: pt.x * main.map_res_factor_x, y: pt.y * main.map_res_factor_y});
 		main.minimap_batched_rects[color].push(new main.Rect({pt: draw_pt, width: 2, height: 2}));
 	};
 
@@ -891,8 +892,8 @@ var Rays = (function() {
 			main.minimap_batched_lines[color] = [];
 		}
 
-		var draw_pt1 = new main.Pt({x: pt1.x * main.map_res_factor_x, y: pt1.y * main.map_res_factor_y});
-		var draw_pt2 = new main.Pt({x: pt2.x * main.map_res_factor_x, y: pt2.y * main.map_res_factor_y});
+		var draw_pt1 = Pt({x: pt1.x * main.map_res_factor_x, y: pt1.y * main.map_res_factor_y});
+		var draw_pt2 = Pt({x: pt2.x * main.map_res_factor_x, y: pt2.y * main.map_res_factor_y});
 
 		main.minimap_batched_lines[color].push({pt1: draw_pt1, pt2: draw_pt2});
 	};
@@ -931,14 +932,14 @@ var Rays = (function() {
 		/*
 		var x, y; // lower bound 1, don't draw borders
 		for (x = 1; x < main.map_img.width; x++) {
-			main.batch_minimap_line(new main.Pt({x: x, y: 0}), new main.Pt({x: x, y: main.map_img.height}), "gray");
+			main.batch_minimap_line(Pt({x: x, y: 0}), Pt({x: x, y: main.map_img.height}), "gray");
 			for (y = 0; y < main.map_img.height; y++) {
-				main.batch_minimap_line(new main.Pt({x: 0, y: y}), new main.Pt({x: main.map_img.width, y: y}), (y === 0 ? "black" : "gray"));
+				main.batch_minimap_line(Pt({x: 0, y: y}), Pt({x: main.map_img.width, y: y}), (y === 0 ? "black" : "gray"));
 			}
 		}
 		*/
 		// now draw player's position on the main map canvas
-		var end_pt = new main.Pt({x: main.player.loc.x + Math.cos(main.player.dir)
+		var end_pt = Pt({x: main.player.loc.x + Math.cos(main.player.dir)
 								, y: main.player.loc.y + Math.sin(main.player.dir)});
 		main.batch_minimap_line(main.player.loc, end_pt, "red");
 
@@ -951,7 +952,7 @@ var Rays = (function() {
 		var main = this;
 
 		var elem_rect = main.canvas.getBoundingClientRect();
-		var touch_pt = new main.Pt({	x: Math.round((e.clientX - elem_rect.left) / (elem_rect.right - elem_rect.left) * main.canvas.width)
+		var touch_pt = Pt({	x: Math.round((e.clientX - elem_rect.left) / (elem_rect.right - elem_rect.left) * main.canvas.width)
 										, y: Math.round((e.clientY - elem_rect.top) / (elem_rect.bottom - elem_rect.top) * main.canvas.height) });
 		return touch_pt;
 	};
@@ -1068,7 +1069,7 @@ var Rays = (function() {
 
 		var init = {x: 0, y: 0, width: draw_width, height: draw_height};
 		var draw_rect = new main.Rect(init);
-		var center = new main.Pt({x: (draw_width * col.idx) - (draw_width / 2.0), y: main.canvas.height / 2.0});
+		var center = Pt({x: (draw_width * col.idx) - (draw_width / 2.0), y: main.canvas.height / 2.0});
 		draw_rect.center(center);
 		
 		// set draw darkness by distance
@@ -1125,7 +1126,7 @@ var Rays = (function() {
 		ret.y = y;
 		ret.square_x = lookup_x;
 		ret.square_y = lookup_y;
-		ret.square_pt = new main.Pt({x: lookup_x, y: lookup_y});
+		ret.square_pt = Pt({x: lookup_x, y: lookup_y});
 		
 		// let's get our texture offset here too... a little wasteful
 		/*var modx = x % 1.0, mody = y % 1.0;
@@ -1183,7 +1184,7 @@ var Rays = (function() {
 		
 		// ang and is_wall are set here only for first loop of while down below
 		var cur = {ang: ang, is_wall: false}, grid_points = [];
-		var temp_pt = new main.Pt({x: main.player.loc.x, y: main.player.loc.y});;
+		var temp_pt = Pt({x: main.player.loc.x, y: main.player.loc.y});;
 		var dist, stop = false, cnt = 0;
 
 		var cos, sin;
@@ -1220,7 +1221,7 @@ var Rays = (function() {
 		var modx = cur.x % 1.0, mody = cur.y % 1.0;
 		cur.tex_offset = (modx === 0) ? mody : modx;
 		
-		grid_points.push(new main.Pt({x: cur.x, y: cur.y}));
+		grid_points.push(Pt({x: cur.x, y: cur.y}));
 		cur.grid_points = grid_points;
 		
 		return cur;
@@ -1267,17 +1268,17 @@ var Rays = (function() {
 		
 		// took out unnecessary Pt creation
 		/*
-		var whole_x_pt = new main.Pt({x: whole_x, y: whole_x_y});
-		var whole_y_pt = new main.Pt({x: whole_y_x, y: whole_y});
+		var whole_x_pt = Pt({x: whole_x, y: whole_x_y});
+		var whole_y_pt = Pt({x: whole_y_x, y: whole_y});
 
-		var init_pt = new main.Pt({x: x, y: y});
+		var init_pt = Pt({x: x, y: y});
 		var whole_x_dist = main.get_dist(init_pt, whole_x_pt);
 		var whole_y_dist = main.get_dist(init_pt, whole_y_pt);
 		*/
 		var whole_x_dist = main.get_dist_nums(x, y, whole_x, whole_x_y);
 		var whole_y_dist = main.get_dist_nums(x, y, whole_y_x, whole_y);
 
-		var ret = whole_x_dist <= whole_y_dist ? new main.Pt({x: whole_x, y: whole_x_y}) : new main.Pt({x: whole_y_x, y: whole_y});
+		var ret = whole_x_dist <= whole_y_dist ? Pt({x: whole_x, y: whole_x_y}) : Pt({x: whole_y_x, y: whole_y});
 
 		return ret;
 	};
@@ -1319,6 +1320,9 @@ var Rays = (function() {
 				// clear mini map
 				main.map_ctx.clearRect(-1, -1, main.map_canvas.width + 1, main.map_canvas.height + 1);
 
+				// get our pt's ready
+				Pt.flip_actives();
+
 				// draw the minimap with the player's new position
 				if (main.use_minimap) {
 					main.draw_minimap();
@@ -1327,6 +1331,7 @@ var Rays = (function() {
 				// draw our columns in the view screen
 				var columns = main.get_columns();
 				columns.forEach(function(col) {
+					console.log('col: ', col.ang);
 					main.draw_column(col);
 					// batch up minimap draw calls
 					if (main.use_minimap) {
@@ -1335,6 +1340,7 @@ var Rays = (function() {
 						});
 					}
 				});
+				return;
 				// draw minimap points
 				if (main.use_minimap) {
 					main.draw_batched_minimap_rects();
