@@ -82,6 +82,7 @@ var Rays = (function() {
 		};
 
 		main.Rect = function(init) {
+			main.num_rects += 1;
 			var rect = this;
 
 			rect.x = null;
@@ -141,7 +142,8 @@ var Rays = (function() {
 
 			if (arguments.length) {
 				// if we were passed a Pt
-				if (arguments.length === 1 && (arguments[0] instanceof main.Pt)) {
+				// fix this too
+				if (arguments.length === 1) {// && (arguments[0] instanceof main.Pt)) {
 					rect.x = arguments[0].x - (rect.width / 2.0);
 					rect.y = arguments[0].y - (rect.height / 2.0);
 				}
@@ -299,6 +301,7 @@ var Rays = (function() {
 		var main = this;
 
 		main.num_pts = 0;
+		main.num_rects = 0;
 		
 		// handle init options
 		main.canvas = init.canvas || null;
@@ -867,7 +870,7 @@ var Rays = (function() {
 		}
 
 		var draw_pt = Pt({x: pt.x * main.map_res_factor_x, y: pt.y * main.map_res_factor_y});
-		main.minimap_batched_rects[color].push(new main.Rect({pt: draw_pt, width: 2, height: 2}));
+		main.minimap_batched_rects[color].push(Rect({x: draw_pt.x, y: draw_pt.y, width: 2, height: 2}));
 	};
 
 	Main.prototype.draw_batched_minimap_rects = function() {
@@ -1068,7 +1071,7 @@ var Rays = (function() {
 		var draw_width = main.canvas.width / main.num_columns;
 
 		var init = {x: 0, y: 0, width: draw_width, height: draw_height};
-		var draw_rect = new main.Rect(init);
+		var draw_rect = Rect(init);
 		var center = Pt({x: (draw_width * col.idx) - (draw_width / 2.0), y: main.canvas.height / 2.0});
 		draw_rect.center(center);
 		
@@ -1188,6 +1191,7 @@ var Rays = (function() {
 		var dist, stop = false, cnt = 0;
 
 		var cos, sin;
+		/*
 		if (main.cos_calls[ang] !== undefined) {
 			cos = main.cos_calls[ang];
 		}
@@ -1202,6 +1206,9 @@ var Rays = (function() {
 			sin = Math.sin(ang);
 			main.sin_calls[ang] = sin;
 		}
+		*/
+		cos = Math.cos(ang);
+		sin = Math.sin(ang);
 
 		while (! cur.is_wall && ! stop && ! main.outside_map(cur)) {
 			temp_pt = main.next_grid(cos, sin, temp_pt.x, temp_pt.y);
@@ -1322,6 +1329,7 @@ var Rays = (function() {
 
 				// get our pt's ready
 				Pt.flip_actives();
+				Rect.flip_actives();
 
 				// draw the minimap with the player's new position
 				if (main.use_minimap) {
@@ -1331,7 +1339,6 @@ var Rays = (function() {
 				// draw our columns in the view screen
 				var columns = main.get_columns();
 				columns.forEach(function(col) {
-					console.log('col: ', col.ang);
 					main.draw_column(col);
 					// batch up minimap draw calls
 					if (main.use_minimap) {
@@ -1340,7 +1347,6 @@ var Rays = (function() {
 						});
 					}
 				});
-				return;
 				// draw minimap points
 				if (main.use_minimap) {
 					main.draw_batched_minimap_rects();

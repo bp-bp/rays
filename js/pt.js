@@ -1,9 +1,6 @@
 var Pt = (function() {
 	var store = {};
 
-	var empty_cnt = 0;
-	var empties = [];//new Map();
-	var actives = [];//new Map();
 	var store = {
 		empties: [],
 		actives: [],
@@ -60,15 +57,15 @@ var Pt = (function() {
 		throw new Error("problem with Pt init, no or invalid xy or Pt provided.");
 	};
 
-	/*
-	for (var q = 0; q < 1000; q++) {
+	
+	for (var q = 0; q < 20000; q++) {
 		create();
 	}
-	*/
+	
 
 	function flip_actives() {
-		console.log('actives.length was: ', store.actives.length);
-		console.log('persist.length is: ', store.persist.length);
+		//console.log('pt actives.length was: ', store.actives.length);
+		//console.log('pt persist.length is: ', store.persist.length);
 		var empties = store.empties;
 		var actives = store.actives;
 		store.empties = actives;
@@ -84,11 +81,11 @@ var Pt = (function() {
 	}
 
 	function create_persist(init) {
-		return pt = create(init, true);
+		return create(init, true);
 	}
 
 	function create(init, persist) {
-		if (init.pt) {
+		if (init && init.pt) {
 			console.log('right heah');
 		}
 		//console.log('create');
@@ -129,8 +126,8 @@ var Pt = (function() {
 		return pt;
 	}
 
-	create.empties = empties;
-	create.actives = actives;
+	//create.empties = empties;
+	//create.actives = actives;
 	create.get_empty = get_empty.bind(create);
 	create.flip_actives = flip_actives.bind(create);
 	create.create_persist = create_persist.bind(create);
